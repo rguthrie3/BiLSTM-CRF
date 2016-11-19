@@ -1,6 +1,8 @@
 import collections
 import argparse
 import random
+import cPickle
+import math
 import dynet as dy
 import numpy as np
 
@@ -73,10 +75,11 @@ class BiLSTM_CRF:
     def forward(self, observations):
 
         def log_sum_exp(scores):
+            # I implemented it like in this implementation
+            # https://github.com/glample/tagger/blob/master/nn.py
             scores_np            = scores.npvalue()
             max_score            = np.max(scores_np, axis=0)
             max_score_broadcast  = max_score.repeat(self.tagset_size).reshape(self.tagset_size, self.tagset_size).T
-            print max_score
             max_score_expr       = dy.inputVector(max_score)
             max_score_bcast_expr = dy.inputMatrix(max_score_broadcast.flatten(), (self.tagset_size, self.tagset_size))
             return max_score_expr + dy.log(dy.sum_cols(dy.transpose(dy.exp(scores - max_score_bcast_expr))))
@@ -90,8 +93,13 @@ class BiLSTM_CRF:
             prev_matrix = dy.concatenate_cols([for_expr] * self.tagset_size)
             scores      = obs_matrix + prev_matrix + trans_matrix
             for_expr    = log_sum_exp(scores)
-        terminal_expr = for_expr + self.transitions[self.tagset_size - 1]
-        alpha         = dy.log(dy.sum_cols(dy.exp(dy.transpose(terminal_expr))))
+        terminal_expr  = for_expr + self.transitions[self.tagset_size - 1]
+        terminal_np    = terminal_expr.npvalue()
+        terminal_max   = np.max(terminal_np)
+        max_expr       = dy.scalarInput(terminal_max)
+        max_bcast      = terminal_max.repeat(self.tagset_size).reshape(self.tagset_size)
+        max_bcast_expr = dy.inputVector(max_bcast)
+        alpha         = max_expr + dy.log(dy.sum_cols(dy.transpose(dy.exp(terminal_expr - max_bcast_expr))))
         return alpha
 
 
@@ -131,29 +139,14 @@ class BiLSTM_CRF:
         return self.model
 
 
-def read(filename, w2i, t2i):
-    instances = []
-    with open(filename, "r") as f:
-        sentence = []
-        tags     = []
-        for line in f:
-            line = line.rstrip().lstrip()
-            if line == "===":
-                instances.append(Instance(sentence, tags))
-                sentence = []
-                tags     = []
-            else:
-                split     = line.split("###")
-                word, tag = split
-                if word not in w2i:
-                    w2i[word] = len(w2i)
-                if tag not in t2i:
-                    t2i[tag] = len(t2i)
-                sentence.append(w2i[word])
-                tags.append(t2i[tag])
-    return instances
+def dump_instance(instance, w2i, t2i):
+    i2t = { i: t for i, t in t2i.items() }
+    i2w = { i: w for i, w in w2i.items() }
+    for word, tag in zip(instance.sentence, instance.tags):
+        print i2w[word], i2t[tag]
 
 parser = argparse.ArgumentParser()
+parser.add_argument("--dataset", required=True, dest="dataset", help=".pkl file to use")
 parser.add_argument("--num-epochs", default=15, dest="num_epochs", help="Number of full passes through training set")
 parser.add_argument("--lstm-layers", default=2, dest="lstm_layers", help="Number of LSTM layers")
 parser.add_argument("--embedding-dim", default=128, dest="embedding_dim", help="Size of Word embeddings")
@@ -162,19 +155,26 @@ parser.add_argument("--learning-rate", default=0.001, dest="learning_rate", help
 parser.add_argument("--dropout", default=-1, dest="dropout", help="Amount of dropout to apply to LSTM part of graph")
 options = parser.parse_args()
 
-w2i = {}
-t2i = {}
-trn_instances = read("test.txt", w2i, t2i) 
+dataset = cPickle.load(open(options.dataset, "r"))
+
+w2i = dataset["w2i"]
+t2i = dataset["t2i"]
+training_instances = dataset["training_instances"]
+dev_instances      = dataset["dev_instances"]
+test_instances     = dataset["test_instances"]
 
 bilstm_crf = BiLSTM_CRF(len(w2i), len(t2i), options.lstm_layers, options.embedding_dim, options.hidden_dim)
 trainer    = dy.AdamTrainer(bilstm_crf.model)
 
 for epoch in xrange(options.num_epochs):
-    random.shuffle(trn_instances)
+    random.shuffle(training_instances)
     train_loss = 0.0
-    for instance in trn_instances:
+    for instance in training_instances:
         loss_expr   = bilstm_crf.neg_log_loss(instance.sentence, instance.tags)
         loss        = loss_expr.scalar_value()
+        print loss
+        if math.isnan(loss):
+            assert False
         train_loss += loss
         loss_expr.backward()
         trainer.update()
