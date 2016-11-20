@@ -5,6 +5,7 @@ import cPickle
 import logging
 import progressbar
 import os
+import math
 import dynet as dy
 import numpy as np
 
@@ -16,9 +17,9 @@ Instance = collections.namedtuple("Instance", ["sentence", "tags"])
 class BiLSTM_CRF:
 
     def __init__(self, vocab_size, tagset_size, num_lstm_layers, embeddings, hidden_dim):
-        self.model       = dy.Model()
+        self.model = dy.Model()
         self.tagset_size = tagset_size
-        embedding_dim    = embeddings.shape[1]
+        embedding_dim = embeddings.shape[1]
 
         # Word embedding parameters
         self.words_lookup = self.model.add_lookup_parameters((vocab_size, embedding_dim))
@@ -38,8 +39,8 @@ class BiLSTM_CRF:
         dy.renew_cg()
 
         embeddings = [self.words_lookup[w] for w in sentence]
-        lstm_out   = self.bi_lstm.transduce(embeddings)
-
+        lstm_out = self.bi_lstm.transduce(embeddings)
+        
         H = dy.parameter(self.lstm_to_tags_params)
         probs = []
         for rep in lstm_out:
@@ -51,9 +52,7 @@ class BiLSTM_CRF:
 
     def score_sentence(self, observations, tags):
         assert len(observations) == len(tags)
-        init_vvars = [-1e10] * self.tagset_size
-        init_vvars[-2] = 0 # <Start> has all the probability
-        score      = dy.scalarInput(0)
+        score = dy.scalarInput(0)
         tags = [self.tagset_size - 2] + tags
         for i, obs in enumerate(observations):
             score = score + dy.pick(self.transitions[tags[i+1]], tags[i]) + obs[tags[i+1]]
@@ -66,15 +65,15 @@ class BiLSTM_CRF:
         viterbi_tags, viterbi_score = self.viterbi_decoding(observations)
         if viterbi_tags != tags:
             gold_score = self.score_sentence(observations, tags)
-            return viterbi_score - gold_score, viterbi_tags
+            return (viterbi_score - gold_score), viterbi_tags
         else:
             return dy.scalarInput(0), viterbi_tags
 
 
     def neg_log_loss(self, sentence, tags):
-        observations  = self.build_tagging_graph(sentence)
+        observations = self.build_tagging_graph(sentence)
         forward_score = self.forward(observations)
-        gold_score    = self.score_sentence(observations, tags)
+        gold_score = self.score_sentence(observations, tags)
         return -(gold_score - forward_score)
 
 
@@ -136,7 +135,9 @@ class BiLSTM_CRF:
         for bptrs_t in reversed(backpointers):
             best_tag_id = bptrs_t[best_tag_id]
             best_path.append(best_tag_id)
-        best_path.pop() # Remove the start symbol
+        start = best_path.pop() # Remove the start symbol
+        best_path.reverse()
+        assert start == t2i["<START>"]
         # Return best path and best path's score
         return best_path, path_score
 
@@ -180,6 +181,8 @@ train_dev_cost = utils.CSVLogger(options.log_dir + "/train_dev.log", ["Train.cos
 dataset = cPickle.load(open(options.dataset, "r"))
 w2i = dataset["w2i"]
 t2i = dataset["t2i"]
+t2i["<START>"] = len(t2i)
+t2i["<STOP>"] = len(t2i)
 i2w = { i: w for w, i in w2i.items() } # Inverse mapping
 i2t = { i: t for t, i in t2i.items() }
 tag_list = [ i2t[idx] for idx in xrange(len(i2t)) ] # To use in the confusion matrix
@@ -200,8 +203,10 @@ for epoch in xrange(options.num_epochs):
     random.shuffle(training_instances)
     train_loss = 0.0
     for instance in bar(training_instances):
-        loss_expr   = bilstm_crf.neg_log_loss(instance.sentence, instance.tags)
-        loss        = loss_expr.scalar_value()
+        loss_expr, viterbi_tags = bilstm_crf.viterbi_loss(instance.sentence, instance.tags)
+        loss = loss_expr.scalar_value()
+        if math.isnan(loss):
+            assert False
         train_loss += (loss / len(instance.sentence))
         loss_expr.backward()
         trainer.update()
@@ -213,14 +218,12 @@ for epoch in xrange(options.num_epochs):
     cm = utils.ConfusionMatrix(tag_list)
     dev_loss = 0.0
     random.shuffle(dev_instances)
-    all_gold    = []
+    all_gold = []
     all_viterbi = []
     for instance in bar(dev_instances):
         viterbi_loss, viterbi_tags = bilstm_crf.viterbi_loss(instance.sentence, instance.tags)
-        dev_loss    += (viterbi_loss.value() / len(instance.sentence))
-        gold_tags    = [ i2t[t] for t in instance.tags ]
-        viterbi_tags = [ i2t[t] for t in viterbi_tags ]
-        all_gold    += gold_tags
+        dev_loss += (viterbi_loss.value() / len(instance.sentence))
+        all_gold += instance.tags
         all_viterbi += viterbi_tags
     correct_tags = 0
     for gold, viterbi in zip(all_gold, all_viterbi):
@@ -229,6 +232,6 @@ for epoch in xrange(options.num_epochs):
     logging.info("Accuracy: {}".format(float(correct_tags) / len(all_gold)))
     cm.add(all_gold, all_viterbi)
     train_loss = train_loss / len(training_instances)
-    dev_loss   = dev_loss / len(dev_instances)
+    dev_loss = dev_loss / len(dev_instances)
     train_dev_cost.add_column([str(train_loss), str(dev_loss)])
-cm.plot()
+    cm.plot()

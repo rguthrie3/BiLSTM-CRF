@@ -71,5 +71,7 @@ def read_pretrained_embeddings(filename, w2i):
     embedding_dim = len(word_to_embed[word_to_embed.keys()[0]])
     out = np.random.uniform(-0.8, 0.8, (len(w2i), embedding_dim))
     for word, embed in word_to_embed.items():
-        out[w2i[word]] = np.array(embed)
+        embed_arr = np.array(embed)
+        if np.linalg.norm(embed_arr) < 30.0:
+            out[w2i[word]] = np.array(embed)
     return out
