@@ -1,10 +1,10 @@
 """
 Reads in raw text datasets turning them into lists of indices for use in training the model.
 Expects text of the form
-word###tag
-word###tag
+word==##==tag
+word==##==tag
 ...
-=== (separate sentences with this token)
+===== (separate sentences with this token)
 word/tag
 word/tag
 ...
@@ -34,15 +34,16 @@ def read_file(filename, w2i, t2i):
     with codecs.open(filename, "r", "utf-8") as f:
         sentence = []
         tags     = []
-        for line in f:
+        for i, line in enumerate(f):
             line = line.rstrip().lstrip()
-            if line == "===":
+            if line == "=====":
                 instances.append(Instance(sentence, tags))
                 sentence = []
                 tags     = []
             else:
-                split     = line.split("###")
+                split     = line.split("==##==")
                 word, tag = split
+                word      = word.lower()
                 if word not in w2i:
                     w2i[word] = len(w2i)
                 if tag not in t2i:
