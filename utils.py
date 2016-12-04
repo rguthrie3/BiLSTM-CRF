@@ -1,3 +1,4 @@
+import cPickle
 import itertools
 import codecs
 import numpy as np
@@ -12,7 +13,8 @@ class CSVLogger:
         self.file.write(','.join(columns) + "\n")
 
     def add_column(self, data):
-        self.file.write(','.join(data) + "\n")
+        self.file.write(','.join([str(d) for d in data]) + "\n")
+        self.file.flush()
 
     def close(self):
         self.file.close()
