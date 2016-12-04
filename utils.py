@@ -75,5 +75,9 @@ def read_pretrained_embeddings(filename, w2i):
     for word, embed in word_to_embed.items():
         embed_arr = np.array(embed)
         if np.linalg.norm(embed_arr) < 30.0:
+            # Theres a reason for this if condition.  Some tokens in ptb
+            # cause numerical problems because they are long strings of the same punctuation, e.g
+            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! which end up having huge norms, since Morfessor will
+            # segment it as a ton of ! and then the sum of these morpheme vectors is huge.
             out[w2i[word]] = np.array(embed)
     return out
