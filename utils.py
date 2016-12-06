@@ -81,3 +81,14 @@ def read_pretrained_embeddings(filename, w2i):
             # segment it as a ton of ! and then the sum of these morpheme vectors is huge.
             out[w2i[word]] = np.array(embed)
     return out
+
+
+def split_tagstring(s):
+    '''
+    Returns attribute-value mapping from UD-type CONLL field
+    '''
+    ret = {}
+    for attval in s.split('|'):
+        a,v = attval.strip().split('=')
+        ret[a] = v
+    return ret
