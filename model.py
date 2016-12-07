@@ -45,7 +45,9 @@ class BiLSTM_CRF:
         
         # Matrix that maps from Bi-LSTM output to num tags
         self.lstm_to_tags_params = self.model.add_parameters((tagset_size, hidden_dim))
+        self.lstm_to_tags_bias = self.model.add_parameters(tagset_size)
         self.mlp_out = self.model.add_parameters((tagset_size, tagset_size))
+        self.mlp_out_bias = self.model.add_parameters(tagset_size)
 
         # Transition matrix for tagging layer, [i,j] is score of transitioning to i from j
         self.transitions = self.model.add_lookup_parameters((tagset_size, tagset_size))
@@ -83,18 +85,21 @@ class BiLSTM_CRF:
             return rep
 
 
-    def build_tagging_graph(self, sentence):
+    def build_tagging_graph(self, sentence, dropout):
         dy.renew_cg()
 
         #embeddings = [self.word_rep(w) for w in sentence]
         embeddings = [self.words_lookup[w] for w in sentence]
+
         lstm_out = self.bi_lstm.transduce(embeddings)
         
         H = dy.parameter(self.lstm_to_tags_params)
+        Hb = dy.parameter(self.lstm_to_tags_bias)
         O = dy.parameter(self.mlp_out)
+        Ob = dy.parameter(self.mlp_out_bias)
         scores = []
         for rep in lstm_out:
-            score_t = O * dy.tanh(H * rep)
+            score_t = O * dy.tanh(H * rep + Hb) + Ob
             scores.append(score_t)
 
         return scores
@@ -112,8 +117,8 @@ class BiLSTM_CRF:
         return score
 
 
-    def viterbi_loss(self, sentence, tags):
-        observations = self.build_tagging_graph(sentence)
+    def viterbi_loss(self, sentence, tags, dropout=False):
+        observations = self.build_tagging_graph(sentence, dropout)
         viterbi_tags, viterbi_score = self.viterbi_decoding(observations)
         if viterbi_tags != tags:
             gold_score = self.score_sentence(observations, tags)
@@ -122,8 +127,8 @@ class BiLSTM_CRF:
             return dy.scalarInput(0), viterbi_tags
 
 
-    def neg_log_loss(self, sentence, tags):
-        observations = self.build_tagging_graph(sentence)
+    def neg_log_loss(self, sentence, tags, dropout=True):
+        observations = self.build_tagging_graph(sentence, dropout)
         gold_score = self.score_sentence(observations, tags)
         forward_score = self.forward(observations)
         return forward_score - gold_score
@@ -199,11 +204,11 @@ parser.add_argument("--dataset", required=True, dest="dataset", help=".pkl file 
 parser.add_argument("--word-embeddings", required=True, dest="word_embeddings", help="File from which to read in pretrained embeds")
 parser.add_argument("--morpheme-embeddings", dest="morpheme_embeddings", help="File from which to read in pretrained embeds")
 parser.add_argument("--morpheme-projection", dest="morpheme_projection", help="Pickle file containing projection matrix if applicable")
-parser.add_argument("--num-epochs", default=50, dest="num_epochs", help="Number of full passes through training set")
-parser.add_argument("--lstm-layers", default=2, dest="lstm_layers", help="Number of LSTM layers")
-parser.add_argument("--hidden-dim", default=128, dest="hidden_dim", help="Size of LSTM hidden layers")
-parser.add_argument("--learning-rate", default=0.001, dest="learning_rate", help="Initial learning rate")
-parser.add_argument("--dropout", default=-1, dest="dropout", help="Amount of dropout to apply to LSTM part of graph")
+parser.add_argument("--num-epochs", default=50, dest="num_epochs", type=int, help="Number of full passes through training set")
+parser.add_argument("--lstm-layers", default=2, dest="lstm_layers", type=int, help="Number of LSTM layers")
+parser.add_argument("--hidden-dim", default=128, dest="hidden_dim", type=int, help="Size of LSTM hidden layers")
+parser.add_argument("--learning-rate", default=0.001, dest="learning_rate", type=float, help="Initial learning rate")
+parser.add_argument("--dropout", default=-1, dest="dropout", type=float, help="Amount of dropout to apply to LSTM part of graph")
 parser.add_argument("--viterbi", dest="viterbi", action="store_true", help="Use viterbi training instead of CRF")
 parser.add_argument("--log-dir", default="log", dest="log_dir", help="Directory where to write logs / serialized models")
 options = parser.parse_args()
@@ -258,8 +263,8 @@ morpheme_embeddings = None
 morpheme_projection = None
 morpheme_decomps = None
 #morpheme_decomps = dataset["morpheme_segmentations"]
-bilstm_crf = BiLSTM_CRF(len(t2i), int(options.lstm_layers), options.hidden_dim, word_embeddings, morpheme_embeddings, morpheme_projection, morpheme_decomps, training_vocab)
-trainer = dy.AdamTrainer(bilstm_crf.model, options.learning_rate)
+bilstm_crf = BiLSTM_CRF(len(t2i), options.lstm_layers, options.hidden_dim, word_embeddings, morpheme_embeddings, morpheme_projection, morpheme_decomps, training_vocab)
+trainer = dy.SimpleSGDTrainer(bilstm_crf.model)
 
 print "Number training instances:", len(training_instances)
 print "Number Dev instances:", len(dev_instances)
@@ -271,8 +276,9 @@ for epoch in xrange(options.num_epochs):
     train_correct = 0
     train_total = 0
     if options.dropout > 0:
-        bilstm_crf.set_dropout(float(options.dropout))
+        bilstm_crf.set_dropout(options.dropout)
     for instance in bar(training_instances):
+        if len(instance.sentence) == 0: continue
         if options.viterbi:
             loss_expr, viterbi_tags = bilstm_crf.viterbi_loss(instance.sentence, instance.tags)
             loss = loss_expr.scalar_value()
@@ -290,6 +296,12 @@ for epoch in xrange(options.num_epochs):
 
         # Bail if loss is NaN
         if math.isnan(loss):
+            sent, tags = utils.convert_instance(instance, i2w, i2t)
+            print sent
+            print tags
+            for word in instance.sentence:
+                print i2w[word], bilstm_crf.words_lookup[word].npvalue()
+                print "\n\n"
             assert False, "NaN occured"
 
         train_loss += (loss / len(instance.sentence))
@@ -302,6 +314,7 @@ for epoch in xrange(options.num_epochs):
     logging.info("\n")
     logging.info("Epoch {} complete".format(epoch + 1))
     trainer.update_epoch(1)
+    print trainer.status()
 
     # Evaluate dev data
     bilstm_crf.disable_dropout()
@@ -312,17 +325,25 @@ for epoch in xrange(options.num_epochs):
     total_wrong = 0
     total_wrong_oov = 0
     for instance in bar(dev_instances):
-        loss = bilstm_crf.neg_log_loss(instance.sentence, instance.tags)
-        viterbi_loss, viterbi_tags = bilstm_crf.viterbi_loss(instance.sentence, instance.tags)
+        loss = bilstm_crf.neg_log_loss(instance.sentence, instance.tags, dropout=False)
         dev_loss += (loss.value() / len(instance.sentence))
+        viterbi_loss, viterbi_tags = bilstm_crf.viterbi_loss(instance.sentence, instance.tags)
+        correct_sent = True
         for i, (gold, viterbi) in enumerate(zip(instance.tags, viterbi_tags)):
             if gold == viterbi:
                 dev_correct += 1
             else:
                 # Got the wrong tag
                 total_wrong += 1
+                correct_sent = False
                 if i2w[instance.sentence[i]] not in training_vocab:
                     total_wrong_oov += 1
+        # if not correct_sent:
+        #     sent, tags = utils.convert_instance(instance, i2w, i2t)
+        #     logging.info(sent)
+        #     logging.info(tags)
+        #     logging.info( [i2t[t] for t in viterbi_tags] )
+        #     logging.info( "\n\n\n" )
                 
         dev_total += len(instance.tags)
     if options.viterbi:
