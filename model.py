@@ -264,7 +264,7 @@ morpheme_projection = None
 morpheme_decomps = None
 #morpheme_decomps = dataset["morpheme_segmentations"]
 bilstm_crf = BiLSTM_CRF(len(t2i), options.lstm_layers, options.hidden_dim, word_embeddings, morpheme_embeddings, morpheme_projection, morpheme_decomps, training_vocab)
-trainer = dy.SimpleSGDTrainer(bilstm_crf.model)
+trainer = dy.AdamTrainer(bilstm_crf.model, options.learning_rate)
 
 print "Number training instances:", len(training_instances)
 print "Number Dev instances:", len(dev_instances)
