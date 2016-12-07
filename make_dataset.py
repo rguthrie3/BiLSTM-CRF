@@ -29,11 +29,12 @@ def read_morpheme_segmentations(filename, w2i, m2i):
         for line in f:
             split = line.rstrip().lstrip().split()
             word = split[0]
-            morphemes = split[1:]
-            for m in morphemes:
-                if m not in m2i:
-                    m2i[m] = len(m2i)
-            segmentations[w2i[word]] = [ m2i[m] for m in morphemes ]
+            if word in w2i:
+                morphemes = split[1:]
+                for m in morphemes:
+                    if m not in m2i:
+                        m2i[m] = len(m2i)
+                segmentations[w2i[word]] = [ m2i[m] for m in morphemes ]
     return segmentations
 
 

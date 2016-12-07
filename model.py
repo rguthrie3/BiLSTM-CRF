@@ -264,7 +264,7 @@ trainer = dy.AdamTrainer(bilstm_crf.model, options.learning_rate)
 print "Number training instances:", len(training_instances)
 print "Number Dev instances:", len(dev_instances)
 
-for epoch in xrange(options.num_epochs):
+for epoch in xrange(int(options.num_epochs)):
     bar = progressbar.ProgressBar()
     random.shuffle(training_instances)
     train_loss = 0.0
