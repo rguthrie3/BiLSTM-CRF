@@ -75,7 +75,7 @@ def read_pretrained_embeddings(filename, w2i):
     out = np.random.uniform(-0.8, 0.8, (len(w2i), embedding_dim))
     for word, embed in word_to_embed.items():
         embed_arr = np.array(embed)
-        if np.linalg.norm(embed_arr) < 30.0 and word in w2i:
+        if np.linalg.norm(embed_arr) < 15.0 and word in w2i:
             # Theres a reason for this if condition.  Some tokens in ptb
             # cause numerical problems because they are long strings of the same punctuation, e.g
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! which end up having huge norms, since Morfessor will
