@@ -6,7 +6,7 @@ Created on Nov 30, 2016
 from __future__ import division
 import unittest
 from evaluate_morphotags import Evaluator
-from morphotag_utils import split_tagstring
+from utils import split_tagstring
 from numpy.testing.utils import assert_almost_equal
 
 class Test(unittest.TestCase):
