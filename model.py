@@ -314,7 +314,7 @@ for epoch in xrange(int(options.num_epochs)):
     for instance in bar(dev_instances):
         loss = bilstm_crf.neg_log_loss(instance.sentence, instance.tags)
         viterbi_loss, viterbi_tags = bilstm_crf.viterbi_loss(instance.sentence, instance.tags)
-        dev_loss += (loss.value() / len(instance.sentence))
+        dev_loss += (viterbi_loss.value() / len(instance.sentence))
         for i, (gold, viterbi) in enumerate(zip(instance.tags, viterbi_tags)):
             if gold == viterbi:
                 dev_correct += 1
