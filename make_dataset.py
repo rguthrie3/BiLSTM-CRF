@@ -73,7 +73,7 @@ def read_file(filename, w2i, t2i, mt2i):
                     t2i[tag] = len(t2i)
                 for mtag in morphotags:
                     if mtag not in mt2i:
-                        mt2i[key] = len(mt2i)
+                        mt2i[mtag] = len(mt2i)
                 sentence.append(w2i[word])
                 tags.append(t2i[tag])
                 mtags.append([mt2i[t] for t in morphotags])

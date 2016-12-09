@@ -93,7 +93,7 @@ def split_tagstring(s, uni_key=False):
         return ret
     for attval in s.split('|'):
         a,v = attval.strip().split('=')
-        if uni_key:
+        if not uni_key:
             ret[a] = v
         else:
             ret.append(attval.strip())

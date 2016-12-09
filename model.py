@@ -11,7 +11,7 @@ import numpy as np
 
 import utils
 
-Instance = collections.namedtuple("Instance", ["sentence", "tags"])
+Instance = collections.namedtuple("Instance", ["sentence", "tags", "mtags"])
 
 
 class BiLSTM_CRF:
@@ -238,11 +238,14 @@ w2i["<UNK>"] = len(w2i) # read the comment in word_rep to see why this is necess
 t2i = dataset["t2i"]
 #m2i = dataset["m2i"]
 m2i = None
+mt2i = dataset["mt2i"]
 t2i["<START>"] = len(t2i)
 t2i["<STOP>"] = len(t2i)
 i2w = { i: w for w, i in w2i.items() } # Inverse mapping
 i2t = { i: t for t, i in t2i.items() }
+i2mt = { i: mt for mt, i in mt2i.items() }
 tag_list = [ i2t[idx] for idx in xrange(len(i2t)) ] # To use in the confusion matrix
+mtag_list = [ i2mt[idx] for idx in xrange(len(i2mt)) ] # because why not
 training_instances = dataset["training_instances"]
 training_vocab = dataset["training_vocab"]
 dev_instances = dataset["dev_instances"]
@@ -332,7 +335,7 @@ for epoch in xrange(int(options.num_epochs)):
         loss = bilstm_crf.neg_log_loss(instance.sentence, instance.tags, dropout=False)
         dev_loss += (loss.value() / len(instance.sentence))
         viterbi_loss, viterbi_tags = bilstm_crf.viterbi_loss(instance.sentence, instance.tags)
-        dev_writer.write("\n" + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence], [i2t[t] for t in instance.tags], [i2t[t] for t in viterbi_tags])]) + "\n")
+        dev_writer.write("\n" + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence], [i2t[t] for t in instance.tags], [i2t[t] for t in viterbi_tags])], [i2mt[mt] for mt in instance.mtags]) + "\n")
         correct_sent = True
         for word, gold, viterbi in zip(instance.sentence, instance.tags, viterbi_tags):
             if gold == viterbi:
