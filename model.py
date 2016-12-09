@@ -327,7 +327,7 @@ for epoch in xrange(int(options.num_epochs)):
     bar = progressbar.ProgressBar()
     total_wrong = 0
     total_wrong_oov = 0
-    dev_writer.write("epoch " + str(epoch) + "\n")
+    dev_writer.write("\nepoch " + str(epoch))
     for instance in bar(dev_instances):
         loss = bilstm_crf.neg_log_loss(instance.sentence, instance.tags, dropout=False)
         dev_loss += (loss.value() / len(instance.sentence))
