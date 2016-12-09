@@ -211,6 +211,7 @@ parser.add_argument("--learning-rate", default=0.001, dest="learning_rate", type
 parser.add_argument("--dropout", default=-1, dest="dropout", type=float, help="Amount of dropout to apply to LSTM part of graph")
 parser.add_argument("--viterbi", dest="viterbi", action="store_true", help="Use viterbi training instead of CRF")
 parser.add_argument("--log-dir", default="log", dest="log_dir", help="Directory where to write logs / serialized models")
+parser.add_argument("--dev-output", default="dev-out", dest="dev_output", help="File with output examples")
 options = parser.parse_args()
 
 
@@ -269,6 +270,7 @@ trainer = dy.AdamTrainer(bilstm_crf.model, options.learning_rate)
 print "Number training instances:", len(training_instances)
 print "Number Dev instances:", len(dev_instances)
 
+dev_writer = open(options.dev_output, 'w')
 for epoch in xrange(int(options.num_epochs)):
     bar = progressbar.ProgressBar()
     random.shuffle(training_instances)
@@ -324,10 +326,12 @@ for epoch in xrange(int(options.num_epochs)):
     bar = progressbar.ProgressBar()
     total_wrong = 0
     total_wrong_oov = 0
+    dev_writer.write("epoch " + str(epoch) + "\n")
     for instance in bar(dev_instances):
         loss = bilstm_crf.neg_log_loss(instance.sentence, instance.tags, dropout=False)
         dev_loss += (loss.value() / len(instance.sentence))
         viterbi_loss, viterbi_tags = bilstm_crf.viterbi_loss(instance.sentence, instance.tags)
+        dev_writer.write("\n" + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence], [i2t[t] for t in instance.tags], [i2t[t] for t in viterbi_tags])]) + "\n")
         correct_sent = True
         for i, (gold, viterbi) in enumerate(zip(instance.tags, viterbi_tags)):
             if gold == viterbi:
