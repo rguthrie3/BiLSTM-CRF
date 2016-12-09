@@ -87,14 +87,16 @@ def read_pretrained_embeddings(filename, w2i):
 def split_tagstring(s, uni_key=False):
     '''
     Returns attribute-value mapping from UD-type CONLL field
+    @param uni_key: if toggled, returns attribute-value pairs as joined strings (with the '=')
     '''
     ret = [] if uni_key else {}
     if "=" not in s: # incorrect format
         return ret
     for attval in s.split('|'):
-        a,v = attval.strip().split('=')
+        attval = attval.strip()
         if not uni_key:
+            a,v = attval.split('=')
             ret[a] = v
         else:
-            ret.append(attval.strip())
+            ret.append(attval)
     return ret
