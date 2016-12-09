@@ -335,7 +335,7 @@ for epoch in xrange(int(options.num_epochs)):
         loss = bilstm_crf.neg_log_loss(instance.sentence, instance.tags, dropout=False)
         dev_loss += (loss.value() / len(instance.sentence))
         viterbi_loss, viterbi_tags = bilstm_crf.viterbi_loss(instance.sentence, instance.tags)
-        dev_writer.write("\n" + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence], [i2t[t] for t in instance.tags], [i2t[t] for t in viterbi_tags])], [i2mt[mt] for mt in instance.mtags]) + "\n")
+        dev_writer.write("\n" + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence], [i2t[t] for t in instance.tags], [i2t[t] for t in viterbi_tags], ["|".join([i2mt[mt] for mt in mts]) for mts in instance.mtags])]) + "\n")
         correct_sent = True
         for word, gold, viterbi in zip(instance.sentence, instance.tags, viterbi_tags):
             if gold == viterbi:
