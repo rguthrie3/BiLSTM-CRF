@@ -11,7 +11,7 @@ import numpy as np
 
 import utils
 
-Instance = collections.namedtuple("Instance", ["sentence", "tags"])
+Instance = collections.namedtuple("Instance", ["sentence", "tags", "mtags"])
 
 
 class BiLSTM_CRF:
@@ -146,7 +146,7 @@ class BiLSTM_CRF:
         init_alphas = [-1e10] * self.tagset_size
         init_alphas[t2i["<START>"]] = 0
         for_expr = dy.inputVector(init_alphas)
-        for i, obs in enumerate(observations):
+        for obs in observations:
             alphas_t = []
             for next_tag in range(self.tagset_size):
                 obs_broadcast = dy.concatenate([dy.pick(obs, next_tag)] * self.tagset_size)
@@ -164,7 +164,7 @@ class BiLSTM_CRF:
         init_vvars[t2i["<START>"]] = 0 # <Start> has all the probability
         for_expr     = dy.inputVector(init_vvars)
         trans_exprs  = [self.transitions[idx] for idx in range(self.tagset_size)]
-        for i, obs in enumerate(observations):
+        for obs in observations:
             bptrs_t = []
             vvars_t = []
             for next_tag in range(self.tagset_size):
@@ -211,6 +211,7 @@ parser.add_argument("--learning-rate", default=0.001, dest="learning_rate", type
 parser.add_argument("--dropout", default=-1, dest="dropout", type=float, help="Amount of dropout to apply to LSTM part of graph")
 parser.add_argument("--viterbi", dest="viterbi", action="store_true", help="Use viterbi training instead of CRF")
 parser.add_argument("--log-dir", default="log", dest="log_dir", help="Directory where to write logs / serialized models")
+parser.add_argument("--dev-output", default="dev-out", dest="dev_output", help="File with output examples")
 options = parser.parse_args()
 
 
@@ -237,11 +238,14 @@ w2i["<UNK>"] = len(w2i) # read the comment in word_rep to see why this is necess
 t2i = dataset["t2i"]
 #m2i = dataset["m2i"]
 m2i = None
+mt2i = dataset["mt2i"]
 t2i["<START>"] = len(t2i)
 t2i["<STOP>"] = len(t2i)
 i2w = { i: w for w, i in w2i.items() } # Inverse mapping
 i2t = { i: t for t, i in t2i.items() }
+i2mt = { i: mt for mt, i in mt2i.items() }
 tag_list = [ i2t[idx] for idx in xrange(len(i2t)) ] # To use in the confusion matrix
+mtag_list = [ i2mt[idx] for idx in xrange(len(i2mt)) ] # because why not
 training_instances = dataset["training_instances"]
 training_vocab = dataset["training_vocab"]
 dev_instances = dataset["dev_instances"]
@@ -269,7 +273,8 @@ trainer = dy.AdamTrainer(bilstm_crf.model, options.learning_rate)
 print "Number training instances:", len(training_instances)
 print "Number Dev instances:", len(dev_instances)
 
-for epoch in xrange(options.num_epochs):
+dev_writer = open(options.dev_output, 'w')
+for epoch in xrange(int(options.num_epochs)):
     bar = progressbar.ProgressBar()
     random.shuffle(training_instances)
     train_loss = 0.0
@@ -321,23 +326,29 @@ for epoch in xrange(options.num_epochs):
     dev_loss = 0.0
     dev_correct = 0
     dev_total = 0
+    dev_oov_total = 0
     bar = progressbar.ProgressBar()
     total_wrong = 0
     total_wrong_oov = 0
+    dev_writer.write("\nepoch " + str(epoch) + "\n")
     for instance in bar(dev_instances):
         loss = bilstm_crf.neg_log_loss(instance.sentence, instance.tags, dropout=False)
         dev_loss += (loss.value() / len(instance.sentence))
         viterbi_loss, viterbi_tags = bilstm_crf.viterbi_loss(instance.sentence, instance.tags)
+        dev_writer.write("\n" + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence], [i2t[t] for t in instance.tags], [i2t[t] for t in viterbi_tags], ["|".join([i2mt[mt] for mt in mts]) for mts in instance.mtags])]) + "\n")
         correct_sent = True
-        for i, (gold, viterbi) in enumerate(zip(instance.tags, viterbi_tags)):
+        for word, gold, viterbi in zip(instance.sentence, instance.tags, viterbi_tags):
             if gold == viterbi:
                 dev_correct += 1
             else:
                 # Got the wrong tag
                 total_wrong += 1
                 correct_sent = False
-                if i2w[instance.sentence[i]] not in training_vocab:
+                if i2w[word] not in training_vocab:
                     total_wrong_oov += 1
+            
+            if i2w[word] not in training_vocab:
+                dev_oov_total += 1
         # if not correct_sent:
         #     sent, tags = utils.convert_instance(instance, i2w, i2t)
         #     logging.info(sent)
@@ -349,6 +360,7 @@ for epoch in xrange(options.num_epochs):
     if options.viterbi:
         logging.info("Train Accuracy: {}".format(float(train_correct) / train_total))
     logging.info("Dev Accuracy: {}".format(float(dev_correct) / dev_total))
+    logging.info("% OOV accuracy: {}".format(float(dev_oov_total - total_wrong_oov) / dev_oov_total))
     if total_wrong > 0:
         logging.info("% Wrong that are OOV: {}".format(float(total_wrong_oov) / total_wrong))
 

@@ -67,17 +67,36 @@ def read_pretrained_embeddings(filename, w2i):
     with codecs.open(filename, "r", "utf-8") as f:
         for line in f:
             split = line.split()
-            word = split[0]
-            vec = split[1:]
-            word_to_embed[word] = vec
+            if len(split) > 0:
+                word = split[0]
+                vec = split[1:]
+                word_to_embed[word] = vec
     embedding_dim = len(word_to_embed[word_to_embed.keys()[0]])
     out = np.random.uniform(-0.8, 0.8, (len(w2i), embedding_dim))
     for word, embed in word_to_embed.items():
         embed_arr = np.array(embed)
-        if np.linalg.norm(embed_arr) < 15.0:
+        if np.linalg.norm(embed_arr) < 15.0 and word in w2i:
             # Theres a reason for this if condition.  Some tokens in ptb
             # cause numerical problems because they are long strings of the same punctuation, e.g
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! which end up having huge norms, since Morfessor will
             # segment it as a ton of ! and then the sum of these morpheme vectors is huge.
             out[w2i[word]] = np.array(embed)
     return out
+
+
+def split_tagstring(s, uni_key=False):
+    '''
+    Returns attribute-value mapping from UD-type CONLL field
+    @param uni_key: if toggled, returns attribute-value pairs as joined strings (with the '=')
+    '''
+    ret = [] if uni_key else {}
+    if "=" not in s: # incorrect format
+        return ret
+    for attval in s.split('|'):
+        attval = attval.strip()
+        if not uni_key:
+            a,v = attval.split('=')
+            ret[a] = v
+        else:
+            ret.append(attval)
+    return ret
