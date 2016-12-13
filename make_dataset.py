@@ -12,6 +12,7 @@ dev_instances
 test_instances
 w2i: Dict mapping words to indices
 t2i: Dict mapping tags to indices
+c2i: Dict mapping characters to indices
 """
 
  
@@ -37,10 +38,11 @@ def read_morpheme_segmentations(filename, w2i, m2i):
     return segmentations
 
 
-def read_file(filename, w2i, t2i):
+def read_file(filename, w2i, t2i, c2i):
     """
     Read in a dataset and turn it into a list of instances.
-    Modifies the w2i and t2i dicts, adding new words as it sees them.
+    Modifies the w2i, t2i and c2i dicts, adding new words/tags/chars 
+    as it sees them.
     """
     instances = []
     vocab_counter = collections.Counter()
@@ -66,10 +68,40 @@ def read_file(filename, w2i, t2i):
                     w2i[word] = len(w2i)
                 if tag not in t2i:
                     t2i[tag] = len(t2i)
+                for c in word:
+                    if c not in c2i:
+                        c2i[c] = len(c2i)
                 sentence.append(w2i[word])
                 tags.append(t2i[tag])
     return instances, vocab_counter
 
+# def read_file(filename, w2i, t2i):
+#     instances = []
+#     vocab_counter = collections.Counter()
+#     with codecs.open(filename, "r", "utf-8") as f:
+#         sentence = []
+#         tags = []
+#         for i, line in enumerate(f):
+#             if line == "=====\n":
+#                 # Reached the end of a sentence
+#                 instances.append(Instance(sentence, tags))
+#                 sentence = []
+#                 tags = []
+#             else:
+#                 data = line.split("/")
+#                 if len(data) > 2:
+#                     word = '/'.join(data[:-2])
+#                 else:
+#                     word = data[0]
+#                 tag = data[-1]
+#                 vocab_counter[word] += 1
+#                 if word not in w2i:
+#                     w2i[word] = len(w2i)
+#                 if tag not in t2i:
+#                     t2i[tag] = len(t2i)
+#                 sentence.append(w2i[word])
+#                 tags.append(t2i[tag])
+#     return instances, vocab_counter
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--training-data", required=True, dest="training_data", help="Training data .txt file")
@@ -85,16 +117,25 @@ options = parser.parse_args()
 
 w2i = {}
 t2i = {}
+c2i = {}
 output = {}
-output["training_instances"], output["training_vocab"] = read_file(options.training_data, w2i, t2i)
-output["dev_instances"], output["dev_vocab"] = read_file(options.dev_data, w2i, t2i)
-output["test_instances"], output["test_vocab"] = read_file(options.test_data, w2i, t2i)
+output["training_instances"], output["training_vocab"] = read_file(options.training_data, w2i, t2i, c2i)
+output["dev_instances"], output["dev_vocab"] = read_file(options.dev_data, w2i, t2i, c2i)
+output["test_instances"], output["test_vocab"] = read_file(options.test_data, w2i, t2i, c2i)
 if options.morpheme_segmentations is not None:
     m2i = {}
     output["morpheme_segmentations"] = read_morpheme_segmentations(options.morpheme_segmentations, w2i, m2i)
     output["m2i"] = m2i
+
+# Add special tokens / tags / chars to dicts
+w2i["<UNK>"] = len(w2i)
+t2i["<START>"] = len(t2i)
+t2i["<STOP>"] = len(t2i)
+c2i["<*>"] = len(c2i) # padding char
+
 output["w2i"] = w2i
 output["t2i"] = t2i
+output["c2i"] = c2i
 
 with open(options.output, "w") as outfile:
     cPickle.dump(output, outfile)

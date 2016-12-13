@@ -85,7 +85,7 @@ class BiLSTM_CRF:
             return rep
 
 
-    def build_tagging_graph(self, sentence, dropout):
+    def build_tagging_graph(self, sentence):
         dy.renew_cg()
 
         #embeddings = [self.word_rep(w) for w in sentence]
@@ -117,8 +117,8 @@ class BiLSTM_CRF:
         return score
 
 
-    def viterbi_loss(self, sentence, tags, dropout=False):
-        observations = self.build_tagging_graph(sentence, dropout)
+    def viterbi_loss(self, sentence, tags):
+        observations = self.build_tagging_graph(sentence)
         viterbi_tags, viterbi_score = self.viterbi_decoding(observations)
         if viterbi_tags != tags:
             gold_score = self.score_sentence(observations, tags)
@@ -127,8 +127,8 @@ class BiLSTM_CRF:
             return dy.scalarInput(0), viterbi_tags
 
 
-    def neg_log_loss(self, sentence, tags, dropout=True):
-        observations = self.build_tagging_graph(sentence, dropout)
+    def neg_log_loss(self, sentence, tags):
+        observations = self.build_tagging_graph(sentence)
         gold_score = self.score_sentence(observations, tags)
         forward_score = self.forward(observations)
         return forward_score - gold_score
@@ -196,20 +196,117 @@ class BiLSTM_CRF:
         return self.model
 
 
+
+class LSTMTagger:
+
+    def __init__(self, tagset_size, num_lstm_layers, hidden_dim, word_embeddings, train_vocab_ctr, use_char_rnn, charset_size, vocab_size=None, word_embedding_dim=None):
+        self.model = dy.Model()
+        self.tagset_size = tagset_size
+        self.train_vocab_ctr = train_vocab_ctr
+
+        if word_embeddings is not None: # Use pretrained embeddings
+            vocab_size = word_embeddings.shape[0]
+            word_embedding_dim = word_embeddings.shape[1]
+            self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
+            self.words_lookup.init_from_array(word_embeddings)
+        else:
+            self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
+
+        # Char LSTM Parameters
+        self.use_char_rnn = use_char_rnn
+        if use_char_rnn:
+            self.char_lookup = self.model.add_lookup_parameters((charset_size, 20))
+            self.char_bi_lstm = dy.BiRNNBuilder(1, 20, 128, self.model, dy.LSTMBuilder)
+
+        # Word LSTM parameters
+        if use_char_rnn:
+            input_dim = word_embedding_dim + 128
+        else:
+            input_dim = word_embedding_dim
+        self.word_bi_lstm = dy.BiRNNBuilder(num_lstm_layers, input_dim, hidden_dim, self.model, dy.LSTMBuilder)
+
+        # Matrix that maps from Bi-LSTM output to num tags
+        self.lstm_to_tags_params = self.model.add_parameters((tagset_size, hidden_dim))
+        self.lstm_to_tags_bias = self.model.add_parameters(tagset_size)
+        self.mlp_out = self.model.add_parameters((tagset_size, tagset_size))
+        self.mlp_out_bias = self.model.add_parameters(tagset_size)
+
+
+    def word_rep(self, w):
+        wemb = self.words_lookup[w]
+        if self.use_char_rnn:
+            pad_char = c2i["<*>"]
+            char_ids = [pad_char] + [c2i[c] for c in i2w[w]] + [pad_char] # TODO optimize
+            char_embs = [self.char_lookup[cid] for cid in char_ids]
+            char_exprs = self.char_bi_lstm.transduce(char_embs)
+            return dy.concatenate([ wemb, char_exprs[-1] ])
+        else:
+            return wemb
+
+
+    def build_tagging_graph(self, sentence):
+        dy.renew_cg()
+
+        embeddings = [self.word_rep(w) for w in sentence]
+
+        lstm_out = self.word_bi_lstm.transduce(embeddings)
+
+        H = dy.parameter(self.lstm_to_tags_params)
+        Hb = dy.parameter(self.lstm_to_tags_bias)
+        O = dy.parameter(self.mlp_out)
+        Ob = dy.parameter(self.mlp_out_bias)
+        scores = []
+        for rep in lstm_out:
+            score_t = O * dy.tanh(H * rep + Hb) + Ob
+            scores.append(score_t)
+
+        return scores
+
+
+    def loss(self, sentence, tags):
+        observations = self.build_tagging_graph(sentence)
+        errors = []
+        for obs, tag in zip(observations, tags):
+            err_t = dy.pickneglogsoftmax(obs, tag)
+            errors.append(err_t)
+        return dy.esum(errors)
+
+
+    def tag_sentence(self, sentence):
+        observations = self.build_tagging_graph(sentence)
+        observations = [ dy.softmax(obs) for obs in observations ]
+        probs = [ obs.npvalue() for obs in observations ]
+        tag_seq = []
+        for prob in probs:
+            tag_t = np.argmax(prob)
+            tag_seq.append(tag_t)
+        return tag_seq
+
+    
+    def set_dropout(self, p):
+        self.word_bi_lstm.set_dropout(p)
+
+
+    def disable_dropout(self):
+        self.word_bi_lstm.disable_dropout()
+
+
 # ===-----------------------------------------------------------------------===
 # Argument parsing
 # ===-----------------------------------------------------------------------===
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset", required=True, dest="dataset", help=".pkl file to use")
-parser.add_argument("--word-embeddings", required=True, dest="word_embeddings", help="File from which to read in pretrained embeds")
+parser.add_argument("--word-embeddings", dest="word_embeddings", help="File from which to read in pretrained embeds")
 parser.add_argument("--morpheme-embeddings", dest="morpheme_embeddings", help="File from which to read in pretrained embeds")
 parser.add_argument("--morpheme-projection", dest="morpheme_projection", help="Pickle file containing projection matrix if applicable")
-parser.add_argument("--num-epochs", default=50, dest="num_epochs", type=int, help="Number of full passes through training set")
+parser.add_argument("--num-epochs", default=20, dest="num_epochs", type=int, help="Number of full passes through training set")
 parser.add_argument("--lstm-layers", default=2, dest="lstm_layers", type=int, help="Number of LSTM layers")
 parser.add_argument("--hidden-dim", default=128, dest="hidden_dim", type=int, help="Size of LSTM hidden layers")
-parser.add_argument("--learning-rate", default=0.001, dest="learning_rate", type=float, help="Initial learning rate")
+parser.add_argument("--learning-rate", default=0.01, dest="learning_rate", type=float, help="Initial learning rate")
 parser.add_argument("--dropout", default=-1, dest="dropout", type=float, help="Amount of dropout to apply to LSTM part of graph")
 parser.add_argument("--viterbi", dest="viterbi", action="store_true", help="Use viterbi training instead of CRF")
+parser.add_argument("--no-sequence-model", dest="no_sequence_model", action="store_true", help="Use regular LSTM tagger with no viterbi")
+parser.add_argument("--use-char-rnn", dest="use_char_rnn", action="store_true", help="Use character RNN")
 parser.add_argument("--log-dir", default="log", dest="log_dir", help="Directory where to write logs / serialized models")
 options = parser.parse_args()
 
@@ -226,6 +323,18 @@ train_dev_cost = utils.CSVLogger(options.log_dir + "/train_dev.log", ["Train.cos
 # ===-----------------------------------------------------------------------===
 # Log some stuff about this run
 # ===-----------------------------------------------------------------------===
+logging.info(
+"""
+Dataset: {}
+Pretrained Embeddings: {}
+Num Epochs: {}
+LSTM: {} layers, {} hidden dim
+Initial Learning Rate: {}
+Dropout: {}
+Objective: {}
+
+""".format(options.dataset, options.word_embeddings, options.num_epochs, options.lstm_layers, options.hidden_dim,
+           options.learning_rate, options.dropout, "Viterbi" if options.viterbi else "CRF"))
 
 
 # ===-----------------------------------------------------------------------===
@@ -233,14 +342,13 @@ train_dev_cost = utils.CSVLogger(options.log_dir + "/train_dev.log", ["Train.cos
 # ===-----------------------------------------------------------------------===
 dataset = cPickle.load(open(options.dataset, "r"))
 w2i = dataset["w2i"]
-w2i["<UNK>"] = len(w2i) # read the comment in word_rep to see why this is necessary
 t2i = dataset["t2i"]
+c2i = dataset["c2i"]
 #m2i = dataset["m2i"]
 m2i = None
-t2i["<START>"] = len(t2i)
-t2i["<STOP>"] = len(t2i)
 i2w = { i: w for w, i in w2i.items() } # Inverse mapping
 i2t = { i: t for t, i in t2i.items() }
+i2c = { i: c for c, i in c2i.items() }
 tag_list = [ i2t[idx] for idx in xrange(len(i2t)) ] # To use in the confusion matrix
 training_instances = dataset["training_instances"]
 training_vocab = dataset["training_vocab"]
@@ -251,36 +359,60 @@ dev_vocab = dataset["dev_vocab"]
 # ===-----------------------------------------------------------------------===
 # Build model and trainer
 # ===-----------------------------------------------------------------------===
-word_embeddings = utils.read_pretrained_embeddings(options.word_embeddings, w2i)
-#morpheme_embeddings = utils.read_pretrained_embeddings(options.morpheme_embeddings, m2i)
-# if options.morpheme_projection is not None:
-#     assert word_embeddings.shape[1] != morpheme_embeddings.shape[1]
-#     morpheme_projection = cPickle.load(open(options.morpheme_projection, "r"))
-# else:
-#     morpheme_projection = None
+if options.word_embeddings is not None:
+    word_embeddings = utils.read_pretrained_embeddings(options.word_embeddings, w2i)
+else:
+    word_embeddings = None
 
-morpheme_embeddings = None
-morpheme_projection = None
-morpheme_decomps = None
-#morpheme_decomps = dataset["morpheme_segmentations"]
-bilstm_crf = BiLSTM_CRF(len(t2i), options.lstm_layers, options.hidden_dim, word_embeddings, morpheme_embeddings, morpheme_projection, morpheme_decomps, training_vocab)
-trainer = dy.AdamTrainer(bilstm_crf.model, options.learning_rate)
 
-print "Number training instances:", len(training_instances)
-print "Number Dev instances:", len(dev_instances)
+if options.no_sequence_model:
+    model = LSTMTagger(tagset_size=len(t2i),
+                       num_lstm_layers=options.lstm_layers,
+                       hidden_dim=options.hidden_dim,
+                       word_embeddings=word_embeddings,
+                       train_vocab_ctr=training_vocab,
+                       use_char_rnn=options.use_char_rnn,
+                       charset_size=len(c2i),
+                       vocab_size=len(w2i),
+                       word_embedding_dim=128)
+
+else:
+    #morpheme_embeddings = utils.read_pretrained_embeddings(options.morpheme_embeddings, m2i)
+    # if options.morpheme_projection is not None:
+    #     assert word_embeddings.shape[1] != morpheme_embeddings.shape[1]
+    #     morpheme_projection = cPickle.load(open(options.morpheme_projection, "r"))
+    # else:
+    #     morpheme_projection = None
+
+    morpheme_embeddings = None
+    morpheme_projection = None
+    morpheme_decomps = None
+    #morpheme_decomps = dataset["morpheme_segmentations"]
+    model = BiLSTM_CRF(len(t2i), options.lstm_layers, options.hidden_dim, word_embeddings, morpheme_embeddings, morpheme_projection, morpheme_decomps, training_vocab)
+
+
+trainer = dy.MomentumSGDTrainer(model.model, options.learning_rate, 0.9, 0.1)
+logging.info("Training Algorithm: {}".format(type(trainer)))
+
+logging.info("Number training instances: {}".format(len(training_instances)))
+logging.info("Number dev instances: {}".format(len(dev_instances)))
 
 for epoch in xrange(options.num_epochs):
     bar = progressbar.ProgressBar()
-    random.shuffle(training_instances)
+    #random.shuffle(training_instances)
     train_loss = 0.0
     train_correct = 0
     train_total = 0
+
     if options.dropout > 0:
-        bilstm_crf.set_dropout(options.dropout)
+        model.set_dropout(options.dropout)
+
     for instance in bar(training_instances):
         if len(instance.sentence) == 0: continue
+
+        # TODO make the interface all the same here
         if options.viterbi:
-            loss_expr, viterbi_tags = bilstm_crf.viterbi_loss(instance.sentence, instance.tags)
+            loss_expr, viterbi_tags = model.viterbi_loss(instance.sentence, instance.tags)
             loss = loss_expr.scalar_value()
             # Record some info for training accuracy
             if loss > 0:
@@ -290,8 +422,11 @@ for epoch in xrange(options.num_epochs):
             else:
                 train_correct += len(instance.tags)
             train_total += len(instance.tags)
+        elif options.no_sequence_model:
+            loss_expr = model.loss(instance.sentence, instance.tags)
+            loss = loss_expr.scalar_value()
         else:
-            loss_expr = bilstm_crf.neg_log_loss(instance.sentence, instance.tags)
+            loss_expr = model.neg_log_loss(instance.sentence, instance.tags)
             loss = loss_expr.scalar_value()
 
         # Bail if loss is NaN
@@ -300,7 +435,7 @@ for epoch in xrange(options.num_epochs):
             print sent
             print tags
             for word in instance.sentence:
-                print i2w[word], bilstm_crf.words_lookup[word].npvalue()
+                print i2w[word], model.words_lookup[word].npvalue()
                 print "\n\n"
             assert False, "NaN occured"
 
@@ -317,7 +452,7 @@ for epoch in xrange(options.num_epochs):
     print trainer.status()
 
     # Evaluate dev data
-    bilstm_crf.disable_dropout()
+    model.disable_dropout()
     dev_loss = 0.0
     dev_correct = 0
     dev_total = 0
@@ -325,12 +460,18 @@ for epoch in xrange(options.num_epochs):
     total_wrong = 0
     total_wrong_oov = 0
     for instance in bar(dev_instances):
-        loss = bilstm_crf.neg_log_loss(instance.sentence, instance.tags, dropout=False)
-        dev_loss += (loss.value() / len(instance.sentence))
-        viterbi_loss, viterbi_tags = bilstm_crf.viterbi_loss(instance.sentence, instance.tags)
+        if len(instance.sentence) == 0: continue
+        if options.no_sequence_model:
+            loss = model.loss(instance.sentence, instance.tags)
+            dev_loss += (loss.scalar_value() / len(instance.sentence))
+            out_tags = model.tag_sentence(instance.sentence)
+        else:
+            loss = model.neg_log_loss(instance.sentence, instance.tags)
+            dev_loss += (loss.scalar_value() / len(instance.sentence))
+            _, out_tags = model.viterbi_loss(instance.sentence, instance.tags)
         correct_sent = True
-        for i, (gold, viterbi) in enumerate(zip(instance.tags, viterbi_tags)):
-            if gold == viterbi:
+        for i, (gold, out) in enumerate(zip(instance.tags, out_tags)):
+            if gold == out:
                 dev_correct += 1
             else:
                 # Got the wrong tag
@@ -340,12 +481,11 @@ for epoch in xrange(options.num_epochs):
                     total_wrong_oov += 1
         # if not correct_sent:
         #     sent, tags = utils.convert_instance(instance, i2w, i2t)
-        #     logging.info(sent)
-        #     logging.info(tags)
-        #     logging.info( [i2t[t] for t in viterbi_tags] )
+        #     for i in range(len(sent)):
+        #         logging.info( sent[i] + "\t" + tags[i] + "\t" + i2t[viterbi_tags[i]] )
         #     logging.info( "\n\n\n" )
-                
         dev_total += len(instance.tags)
+
     if options.viterbi:
         logging.info("Train Accuracy: {}".format(float(train_correct) / train_total))
     logging.info("Dev Accuracy: {}".format(float(dev_correct) / dev_total))
