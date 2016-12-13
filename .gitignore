@@ -1,0 +1,6 @@
+*.pyc
+.*project
+results/
+log*/
+vocab.txt
+data/

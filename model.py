@@ -11,7 +11,7 @@ import numpy as np
 
 import utils
 
-Instance = collections.namedtuple("Instance", ["sentence", "tags"])
+Instance = collections.namedtuple("Instance", ["sentence", "tags", "mtags"])
 
 
 class BiLSTM_CRF:
@@ -146,7 +146,7 @@ class BiLSTM_CRF:
         init_alphas = [-1e10] * self.tagset_size
         init_alphas[t2i["<START>"]] = 0
         for_expr = dy.inputVector(init_alphas)
-        for i, obs in enumerate(observations):
+        for obs in observations:
             alphas_t = []
             for next_tag in range(self.tagset_size):
                 obs_broadcast = dy.concatenate([dy.pick(obs, next_tag)] * self.tagset_size)
@@ -164,7 +164,7 @@ class BiLSTM_CRF:
         init_vvars[t2i["<START>"]] = 0 # <Start> has all the probability
         for_expr     = dy.inputVector(init_vvars)
         trans_exprs  = [self.transitions[idx] for idx in range(self.tagset_size)]
-        for i, obs in enumerate(observations):
+        for obs in observations:
             bptrs_t = []
             vvars_t = []
             for next_tag in range(self.tagset_size):
@@ -308,6 +308,7 @@ parser.add_argument("--viterbi", dest="viterbi", action="store_true", help="Use 
 parser.add_argument("--no-sequence-model", dest="no_sequence_model", action="store_true", help="Use regular LSTM tagger with no viterbi")
 parser.add_argument("--use-char-rnn", dest="use_char_rnn", action="store_true", help="Use character RNN")
 parser.add_argument("--log-dir", default="log", dest="log_dir", help="Directory where to write logs / serialized models")
+parser.add_argument("--dev-output", default="dev-out", dest="dev_output", help="File with output examples")
 options = parser.parse_args()
 
 
@@ -318,6 +319,7 @@ if not os.path.exists(options.log_dir):
     os.mkdir(options.log_dir)
 logging.basicConfig(filename=options.log_dir + "/log.txt", filemode="w", format="%(message)s", level=logging.INFO)
 train_dev_cost = utils.CSVLogger(options.log_dir + "/train_dev.log", ["Train.cost", "Dev.cost"])
+dev_writer = open(options.dev_output, 'w')
 
 
 # ===-----------------------------------------------------------------------===
@@ -344,12 +346,16 @@ dataset = cPickle.load(open(options.dataset, "r"))
 w2i = dataset["w2i"]
 t2i = dataset["t2i"]
 c2i = dataset["c2i"]
+mt2i = dataset["mt2i"]
 #m2i = dataset["m2i"]
 m2i = None
 i2w = { i: w for w, i in w2i.items() } # Inverse mapping
 i2t = { i: t for t, i in t2i.items() }
 i2c = { i: c for c, i in c2i.items() }
+i2mt = { i: mt for mt, i in mt2i.items() }
+
 tag_list = [ i2t[idx] for idx in xrange(len(i2t)) ] # To use in the confusion matrix
+mtag_list = [ i2mt[idx] for idx in xrange(len(i2mt)) ] # because why not
 training_instances = dataset["training_instances"]
 training_vocab = dataset["training_vocab"]
 dev_instances = dataset["dev_instances"]
@@ -397,9 +403,9 @@ logging.info("Training Algorithm: {}".format(type(trainer)))
 logging.info("Number training instances: {}".format(len(training_instances)))
 logging.info("Number dev instances: {}".format(len(dev_instances)))
 
-for epoch in xrange(options.num_epochs):
+for epoch in xrange(int(options.num_epochs)):
     bar = progressbar.ProgressBar()
-    #random.shuffle(training_instances)
+    random.shuffle(training_instances)
     train_loss = 0.0
     train_correct = 0
     train_total = 0
@@ -431,12 +437,6 @@ for epoch in xrange(options.num_epochs):
 
         # Bail if loss is NaN
         if math.isnan(loss):
-            sent, tags = utils.convert_instance(instance, i2w, i2t)
-            print sent
-            print tags
-            for word in instance.sentence:
-                print i2w[word], model.words_lookup[word].npvalue()
-                print "\n\n"
             assert False, "NaN occured"
 
         train_loss += (loss / len(instance.sentence))
@@ -444,7 +444,6 @@ for epoch in xrange(options.num_epochs):
         # Do backward pass and update parameters
         loss_expr.backward()
         trainer.update()
-
 
     logging.info("\n")
     logging.info("Epoch {} complete".format(epoch + 1))
@@ -456,9 +455,11 @@ for epoch in xrange(options.num_epochs):
     dev_loss = 0.0
     dev_correct = 0
     dev_total = 0
+    dev_oov_total = 0
     bar = progressbar.ProgressBar()
     total_wrong = 0
     total_wrong_oov = 0
+    dev_writer.write("\nepoch " + str(epoch) + "\n")
     for instance in bar(dev_instances):
         if len(instance.sentence) == 0: continue
         if options.no_sequence_model:
@@ -466,19 +467,25 @@ for epoch in xrange(options.num_epochs):
             dev_loss += (loss.scalar_value() / len(instance.sentence))
             out_tags = model.tag_sentence(instance.sentence)
         else:
-            loss = model.neg_log_loss(instance.sentence, instance.tags)
-            dev_loss += (loss.scalar_value() / len(instance.sentence))
+            loss = model.neg_log_loss(instance.sentence, instance.tags, dropout=False)
+            dev_loss += (loss.value() / len(instance.sentence))
             _, out_tags = model.viterbi_loss(instance.sentence, instance.tags)
-        correct_sent = True
-        for i, (gold, out) in enumerate(zip(instance.tags, out_tags)):
+            dev_writer.write("\n" + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence], [i2t[t] for t in instance.tags], [i2t[t] for t in out_tags], ["|".join([i2mt[mt] for mt in mts]) for mts in instance.mtags])]) + "\n")
+            correct_sent = True
+            correct_sent = True
+
+        for word, gold, out in zip(instance.sentence, instance.tags, out_tags):
             if gold == out:
                 dev_correct += 1
             else:
                 # Got the wrong tag
                 total_wrong += 1
                 correct_sent = False
-                if i2w[instance.sentence[i]] not in training_vocab:
+                if i2w[word] not in training_vocab:
                     total_wrong_oov += 1
+            
+            if i2w[word] not in training_vocab:
+                dev_oov_total += 1
         # if not correct_sent:
         #     sent, tags = utils.convert_instance(instance, i2w, i2t)
         #     for i in range(len(sent)):
@@ -489,6 +496,7 @@ for epoch in xrange(options.num_epochs):
     if options.viterbi:
         logging.info("Train Accuracy: {}".format(float(train_correct) / train_total))
     logging.info("Dev Accuracy: {}".format(float(dev_correct) / dev_total))
+    logging.info("% OOV accuracy: {}".format(float(dev_oov_total - total_wrong_oov) / dev_oov_total))
     if total_wrong > 0:
         logging.info("% Wrong that are OOV: {}".format(float(total_wrong_oov) / total_wrong))
 
