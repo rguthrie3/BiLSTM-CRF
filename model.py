@@ -457,27 +457,25 @@ for epoch in xrange(int(options.num_epochs)):
         # TODO make the interface all the same here
         if options.viterbi:
             loss = 0
-            loss_exprs, viterbi_tags_set = model.viterbi_loss(instance.sentence, instance.tags)
-            # TODO handle cases of failed precision (predicted tags that have all-zeros in gold)
-            for att, tags in instance.tags.items():
-                if att not in viterbi_tags_set:
-                    # attribute not predicted at all, still "none"s are correct
-                    train_correct[att] += tags.count(t2is[att]["<NONE>"]) # TODO later remove or make into own cat
-                    # TODO BUG figure out how to compute l
+            gold_tags = instance.tags
+            for att in model.attributes:
+                if att not in instance.tags:
+                    gold_tags[att] = [t2is[att]["<NONE>"]] * len(instance.sentence)
+            loss_exprs, viterbi_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
+            for att, tags in gold_tags.items():
+                vit_tags = viterbi_tags_set[att]
+                l = loss_exprs[att].scalar_value()
+                # Record some info for training accuracy
+                if l > 0:
+                    for gold, viterbi in zip(tags, vit_tags):
+                        if gold == viterbi:
+                            train_correct[att] += 1
                 else:
-                    vit_tags = viterbi_tags_set[att]
-                    l = loss_exprs[att].scalar_value()
-                    # Record some info for training accuracy
-                    if l > 0:
-                        for gold, viterbi in zip(tags, vit_tags):
-                            if gold == viterbi:
-                                train_correct[att] += 1
-                    else:
-                        train_correct[att] += len(instance.tags)
+                    train_correct[att] += len(tags)
                 train_total[att] += len(tags)
                 loss += l
             # TODO this is average. parametrize and allow other formulations
-            loss /= len(instance.tags)
+            loss /= len(gold_tags)
             loss_expr = dy.average(loss_exprs.values())
         elif options.no_sequence_model:
             loss_expr = model.loss(instance.sentence, instance.tags)
@@ -520,15 +518,19 @@ for epoch in xrange(int(options.num_epochs)):
             dev_loss += (loss.scalar_value() / len(instance.sentence))
             out_tags = model.tag_sentence(instance.sentence)
         else:
-            losses = model.neg_log_loss(instance.sentence, instance.tags, dropout=False)
-            _, out_tags_set = model.viterbi_loss(instance.sentence, instance.tags)
+            gold_tags = instance.tags
+            for att in model.attributes:
+                if att not in instance.tags:
+                    gold_tags[att] = [t2is[att]["<NONE>"]] * len(instance.sentence)
+            losses = model.neg_log_loss(instance.sentence, gold_tags)
+            _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
             dl = 0.0
             dev_writer.write("\n"
                              +"\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
                                                                          ["|".join(att + "=" + i2ts[att][v] for att,vals in instance.tags.items() for v in vals)],
                                                                          ["|".join(att + "=" + i2ts[att][v] for att,vals in out_tags_set.items() for v in vals)])])
                              + "\n")
-            for att, tags in instance.tags.items():
+            for att, tags in gold_tags.items():
                 loss = losses[att]
                 out_tags = out_tags_set[att]
                 dl += (loss.value() / len(instance.sentence))
@@ -553,7 +555,7 @@ for epoch in xrange(int(options.num_epochs)):
                 #     logging.info( "\n\n\n" )
                 dev_total[att] += len(tags)
                 
-            dev_loss += (dl / len(instance.tags))
+            dev_loss += (dl / len(gold_tags))
 
     if options.viterbi:
         for att in t2is.keys():
