@@ -1,3 +1,6 @@
+from __future__ import division
+from collections import Counter
+
 import collections
 import argparse
 import random
@@ -11,7 +14,7 @@ import numpy as np
 
 import utils
 
-Instance = collections.namedtuple("Instance", ["sentence", "tags", "mtags"])
+Instance = collections.namedtuple("Instance", ["sentence", "tags"])
 
 
 class BiLSTM_CRF:
@@ -57,7 +60,7 @@ class BiLSTM_CRF:
             self.mlp_out_bias[attribute] = self.model.add_parameters(set_size)
     
             # Transition matrix for tagging layer, [i,j] is score of transitioning to i from j
-            self.transitions = self.model.add_lookup_parameters((set_size, set_size))
+            self.transitions[attribute] = self.model.add_lookup_parameters((set_size, set_size))
 
 
     def set_dropout(self, p):
@@ -114,36 +117,47 @@ class BiLSTM_CRF:
         return scores
 
 
-    def score_sentence(self, observations, tags):
+    def score_sentence(self, observations, tags, att):
         assert len(observations) == len(tags)
+        t2i = t2is[att]
+        trans = self.transitions[att]
         score_seq = [0]
         score = dy.scalarInput(0)
         tags = [t2i["<START>"]] + tags
         for i, obs in enumerate(observations):
-            score = score + dy.pick(self.transitions[tags[i+1]], tags[i]) + dy.pick(obs, tags[i+1])
+            score = score + dy.pick(trans[tags[i+1]], tags[i]) + dy.pick(obs, tags[i+1])
             score_seq.append(score.value())
-        score = score + dy.pick(self.transitions[t2i["<STOP>"]], tags[-1])
+        score = score + dy.pick(trans[t2i["<STOP>"]], tags[-1])
         return score
 
 
-    def viterbi_loss(self, sentence, tags):
-        observations = self.build_tagging_graph(sentence)
-        viterbi_tags, viterbi_score = self.viterbi_decoding(observations)
-        if viterbi_tags != tags:
-            gold_score = self.score_sentence(observations, tags)
-            return (viterbi_score - gold_score), viterbi_tags
-        else:
-            return dy.scalarInput(0), viterbi_tags
+    def viterbi_loss(self, sentence, tags_set):
+        observations_set = self.build_tagging_graph(sentence)
+        losses = ret_tags = {}
+        for att, observations in observations_set.items():
+            tags = tags_set[att]
+            viterbi_tags, viterbi_score = self.viterbi_decoding(observations, att)
+            if viterbi_tags != tags:
+                gold_score = self.score_sentence(observations, tags, att)
+                losses[att] = viterbi_score - gold_score
+                ret_tags[att] = viterbi_tags
+            else:
+                losses[att] = dy.scalarInput(0)
+                ret_tags[att] = viterbi_tags
+        return losses, ret_tags
 
 
     def neg_log_loss(self, sentence, tags):
-        observations = self.build_tagging_graph(sentence)
-        gold_score = self.score_sentence(observations, tags)
-        forward_score = self.forward(observations)
-        return forward_score - gold_score
+        observations_set = self.build_tagging_graph(sentence)
+        scores = {}
+        for att, observations in observations_set:
+            gold_score = self.score_sentence(observations, tags, att)
+            forward_score = self.forward(observations, att)
+            scores[att] = forward_score - gold_score
+        return scores
 
 
-    def forward(self, observations):
+    def forward(self, observations, att):
 
         def log_sum_exp(scores):
             npval = scores.npvalue()
@@ -152,17 +166,20 @@ class BiLSTM_CRF:
             max_score_expr_broadcast = dy.concatenate([max_score_expr] * self.tagset_sizes)
             return max_score_expr + dy.log(dy.sum_cols(dy.transpose(dy.exp(scores - max_score_expr_broadcast))))
 
-        init_alphas = [-1e10] * self.tagset_sizes
+        t2i = t2is[att]
+        trans = self.transitions[att]
+        tagset_size = self.tagset_sizes[att]
+        init_alphas = [-1e10] * tagset_size
         init_alphas[t2i["<START>"]] = 0
         for_expr = dy.inputVector(init_alphas)
         for obs in observations:
             alphas_t = []
-            for next_tag in range(self.tagset_sizes):
-                obs_broadcast = dy.concatenate([dy.pick(obs, next_tag)] * self.tagset_sizes)
-                next_tag_expr = for_expr + self.transitions[next_tag] + obs_broadcast
+            for next_tag in range(tagset_size):
+                obs_broadcast = dy.concatenate([dy.pick(obs, next_tag)] * tagset_size)
+                next_tag_expr = for_expr + trans[next_tag] + obs_broadcast
                 alphas_t.append(log_sum_exp(next_tag_expr))
             for_expr = dy.concatenate(alphas_t)
-        terminal_expr = for_expr + self.transitions[t2i["<STOP>"]]
+        terminal_expr = for_expr + trans[t2i["<STOP>"]]
         alpha = log_sum_exp(terminal_expr)
         return alpha
 
@@ -210,7 +227,7 @@ class LSTMTagger:
 
     def __init__(self, tagset_size, num_lstm_layers, hidden_dim, word_embeddings, train_vocab_ctr, use_char_rnn, charset_size, vocab_size=None, word_embedding_dim=None):
         self.model = dy.Model()
-        self.tagset_sizes = tagset_size
+        self.tagset_size = tagset_size
         self.train_vocab_ctr = train_vocab_ctr
 
         if word_embeddings is not None: # Use pretrained embeddings
@@ -272,7 +289,8 @@ class LSTMTagger:
         return scores
 
 
-    def loss(self, sentence, tags):
+    def loss(self, sentence, tags_set):
+        tags = tags_set["POS"]
         observations = self.build_tagging_graph(sentence)
         errors = []
         for obs, tag in zip(observations, tags):
@@ -353,22 +371,15 @@ Objective: {}
 # ===-----------------------------------------------------------------------===
 dataset = cPickle.load(open(options.dataset, "r"))
 w2i = dataset["w2i"]
-t2i = dataset["t2i"]
+t2is = dataset["t2is"]
 c2i = dataset["c2i"]
-mt2i = dataset["mt2i"]
-mt_ctr = dataset["mt_ctr"]
 #m2i = dataset["m2i"]
 m2i = None
 i2w = { i: w for w, i in w2i.items() } # Inverse mapping
-i2t = { i: t for t, i in t2i.items() }
+i2ts = { att: {i: t for t, i in t2i.items()} for att, t2i in t2is.items() }
 i2c = { i: c for c, i in c2i.items() }
-if mt_ctr == 0: # flat morphotag hierarchy
-    i2mt = { i: mt for mt, i in mt2i.items() }
-else:
-    i2mt = { i: (x,y) for x, vals in mt2i.items() for y, i in vals.items() }
-    
-tag_list = [ i2t[idx] for idx in xrange(len(i2t)) ] # To use in the confusion matrix
-mtag_list = [ i2mt[idx] for idx in xrange(len(i2mt)) ] # because why not
+
+tag_lists = { att: [ i2t[idx] for idx in xrange(len(i2t)) ] for att, i2t in i2ts.items() } # To use in the confusion matrix
 training_instances = dataset["training_instances"]
 training_vocab = dataset["training_vocab"]
 dev_instances = dataset["dev_instances"]
@@ -385,7 +396,7 @@ else:
 
 
 if options.no_sequence_model:
-    model = LSTMTagger(tagset_size=len(t2i),
+    model = LSTMTagger(tagset_size=len(t2is["POS"]),
                        num_lstm_layers=options.lstm_layers,
                        hidden_dim=options.hidden_dim,
                        word_embeddings=word_embeddings,
@@ -407,7 +418,14 @@ else:
     morpheme_projection = None
     morpheme_decomps = None
     #morpheme_decomps = dataset["morpheme_segmentations"]
-    model = BiLSTM_CRF(len(t2i), options.lstm_layers, options.hidden_dim, word_embeddings, morpheme_embeddings, morpheme_projection, morpheme_decomps, training_vocab)
+    model = BiLSTM_CRF({ att: len(t2i) for att, t2i in t2is.items() },
+                       options.lstm_layers,
+                       options.hidden_dim,
+                       word_embeddings,
+                       morpheme_embeddings,
+                       morpheme_projection,
+                       morpheme_decomps,
+                       training_vocab)
 
 
 trainer = dy.MomentumSGDTrainer(model.model, options.learning_rate, 0.9, 0.1)
@@ -420,8 +438,8 @@ for epoch in xrange(int(options.num_epochs)):
     bar = progressbar.ProgressBar()
     random.shuffle(training_instances)
     train_loss = 0.0
-    train_correct = 0
-    train_total = 0
+    train_correct = Counter()
+    train_total = Counter()
 
     if options.dropout > 0:
         model.set_dropout(options.dropout)
@@ -431,21 +449,36 @@ for epoch in xrange(int(options.num_epochs)):
 
         # TODO make the interface all the same here
         if options.viterbi:
-            loss_expr, viterbi_tags = model.viterbi_loss(instance.sentence, instance.tags)
-            loss = loss_expr.scalar_value()
-            # Record some info for training accuracy
-            if loss > 0:
-                for gold, viterbi in zip(instance.tags, viterbi_tags):
-                    if gold == viterbi:
-                        train_correct += 1
-            else:
-                train_correct += len(instance.tags)
-            train_total += len(instance.tags)
+            loss = 0
+            loss_exprs, viterbi_tags_set = model.viterbi_loss(instance.sentence, instance.tags)
+            # TODO handle cases of failed precision (predicted tags that have all-zeros in gold)
+            for att, tags in instance.tags:
+                if att not in viterbi_tags_set:
+                    # attribute not predicted at all, still "none"s are correct
+                    train_correct[att] += tags.count(t2is[att]["<NONE>"]) # TODO later remove or make into own cat
+                    # TODO BUG figure out how to compute l
+                else:
+                    vit_tags = viterbi_tags_set[att]
+                    l = loss_exprs[att].scalar_value()
+                    # Record some info for training accuracy
+                    if l > 0:
+                        for gold, viterbi in zip(tags, vit_tags):
+                            if gold == viterbi:
+                                train_correct[att] += 1
+                    else:
+                        train_correct[att] += len(instance.tags)
+                train_total[att] += len(tags)
+                loss += l
+            # TODO this is average. parametrize and allow other formulations
+            loss /= len(instance.tags)
+            loss_expr = dy.average(loss_exprs.values())
         elif options.no_sequence_model:
             loss_expr = model.loss(instance.sentence, instance.tags)
             loss = loss_expr.scalar_value()
         else:
-            loss_expr = model.neg_log_loss(instance.sentence, instance.tags)
+            loss_exprs = model.neg_log_loss(instance.sentence, instance.tags)
+            # TODO parametrize and allow other formulations
+            loss_expr = dy.average(loss_exprs)
             loss = loss_expr.scalar_value()
 
         # Bail if loss is NaN
@@ -466,12 +499,12 @@ for epoch in xrange(int(options.num_epochs)):
     # Evaluate dev data
     model.disable_dropout()
     dev_loss = 0.0
-    dev_correct = 0
-    dev_total = 0
-    dev_oov_total = 0
+    dev_correct = Counter()
+    dev_total = Counter()
+    dev_oov_total = Counter()
     bar = progressbar.ProgressBar()
-    total_wrong = 0
-    total_wrong_oov = 0
+    total_wrong = Counter()
+    total_wrong_oov = Counter()
     dev_writer.write("\nepoch " + str(epoch) + "\n")
     for instance in bar(dev_instances):
         if len(instance.sentence) == 0: continue
@@ -480,38 +513,49 @@ for epoch in xrange(int(options.num_epochs)):
             dev_loss += (loss.scalar_value() / len(instance.sentence))
             out_tags = model.tag_sentence(instance.sentence)
         else:
-            loss = model.neg_log_loss(instance.sentence, instance.tags, dropout=False)
-            dev_loss += (loss.value() / len(instance.sentence))
-            _, out_tags = model.viterbi_loss(instance.sentence, instance.tags)
-            dev_writer.write("\n" + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence], [i2t[t] for t in instance.tags], [i2t[t] for t in out_tags], ["|".join([i2mt[mt] for mt in mts]) for mts in instance.mtags])]) + "\n")
-            correct_sent = True
-            correct_sent = True
-
-        for word, gold, out in zip(instance.sentence, instance.tags, out_tags):
-            if gold == out:
-                dev_correct += 1
-            else:
-                # Got the wrong tag
-                total_wrong += 1
-                correct_sent = False
-                if i2w[word] not in training_vocab:
-                    total_wrong_oov += 1
-            
-            if i2w[word] not in training_vocab:
-                dev_oov_total += 1
-        # if not correct_sent:
-        #     sent, tags = utils.convert_instance(instance, i2w, i2t)
-        #     for i in range(len(sent)):
-        #         logging.info( sent[i] + "\t" + tags[i] + "\t" + i2t[viterbi_tags[i]] )
-        #     logging.info( "\n\n\n" )
-        dev_total += len(instance.tags)
+            losses = model.neg_log_loss(instance.sentence, instance.tags, dropout=False)
+            _, out_tags_set = model.viterbi_loss(instance.sentence, instance.tags)
+            dl = 0.0
+            dev_writer.write("\n"
+                             +"\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
+                                                                         ["|".join(att + "=" + i2ts[att][v] for att,vals in instance.tags.items() for v in vals)],
+                                                                         ["|".join(att + "=" + i2ts[att][v] for att,vals in out_tags_set for v in vals)])])
+                             + "\n")
+            for att, tags in instance.tags.items():
+                loss = losses[att]
+                out_tags = out_tags_set[att]
+                dl += (loss.value() / len(instance.sentence))
+                correct_sent = True
+    
+                for word, gold, out in zip(instance.sentence, tags, out_tags):
+                    if gold == out:
+                        dev_correct[att] += 1
+                    else:
+                        # Got the wrong tag
+                        total_wrong[att] += 1
+                        correct_sent = False
+                        if i2w[word] not in training_vocab:
+                            total_wrong_oov[att] += 1
+                    
+                    if i2w[word] not in training_vocab:
+                        dev_oov_total[att] += 1
+                # if not correct_sent:
+                #     sent, tags = utils.convert_instance(instance, i2w, i2t)
+                #     for i in range(len(sent)):
+                #         logging.info( sent[i] + "\t" + tags[i] + "\t" + i2t[viterbi_tags[i]] )
+                #     logging.info( "\n\n\n" )
+                dev_total[att] += len(tags)
+                
+            dev_loss += (dl / len(instance.tags))
 
     if options.viterbi:
-        logging.info("Train Accuracy: {}".format(float(train_correct) / train_total))
-    logging.info("Dev Accuracy: {}".format(float(dev_correct) / dev_total))
-    logging.info("% OOV accuracy: {}".format(float(dev_oov_total - total_wrong_oov) / dev_oov_total))
-    if total_wrong > 0:
-        logging.info("% Wrong that are OOV: {}".format(float(total_wrong_oov) / total_wrong))
+        for att in t2is.keys():
+            logging.info("{} Train Accuracy: {}".format(att, train_correct[att] / train_total[att]))
+    for att in t2is.keys():
+        logging.info("{} Dev Accuracy: {}".format(att, dev_correct[att] / dev_total[att]))
+        logging.info("{} % OOV accuracy: {}".format(att, (dev_oov_total[att] - total_wrong_oov[att]) / dev_oov_total[att]))
+        if total_wrong[att] > 0:
+            logging.info("{} % Wrong that are OOV: {}".format(att, total_wrong_oov[att] / total_wrong[att]))
 
     train_loss = train_loss / len(training_instances)
     dev_loss = dev_loss / len(dev_instances)
