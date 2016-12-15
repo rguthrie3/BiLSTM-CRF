@@ -41,11 +41,12 @@ def read_morpheme_segmentations(filename, w2i, m2i):
     return segmentations
 
 
-def read_file(filename, w2i, t2i, mt2i, c2i):
+def read_file(filename, w2i, t2i, mt2i, c2i, mt2ictr = 0):
     """
     Read in a dataset and turn it into a list of instances.
     Modifies the w2i, t2i, mt2i and c2i dicts, adding new words/tags/chars 
     as it sees them.
+    @param mt2ictr keeps count of the embedded size of mt2i
     """
     instances = []
     vocab_counter = collections.Counter()
@@ -68,7 +69,7 @@ def read_file(filename, w2i, t2i, mt2i, c2i):
                     continue
                 word = data[1]
                 tag = data[3] if options.ud_tags else data[4]
-                morphotags = split_tagstring(data[5], uni_key=True) if options.morphotags else {}
+                morphotags = split_tagstring(data[5], uni_key=options.flat_morphotags) if options.morphotags else {}
                 vocab_counter[word] += 1
                 if word not in w2i:
                     w2i[word] = len(w2i)
@@ -78,12 +79,23 @@ def read_file(filename, w2i, t2i, mt2i, c2i):
                     if c not in c2i:
                         c2i[c] = len(c2i)
                 for mtag in morphotags:
-                    if mtag not in mt2i:
-                        mt2i[mtag] = len(mt2i)
+                    if options.flat_morphotags:
+                        if mtag not in mt2i:
+                            mt2i[mtag] = len(mt2i)
+                    else:
+                        key, val = mtag
+                        if key not in mt2i:
+                            mt2i[key] = {}
+                        if val not in mt2i[key]:
+                            mt2i[key][val] = mt2ictr
+                            mt2ictr += 1
                 sentence.append(w2i[word])
                 tags.append(t2i[tag])
-                mtags.append([mt2i[t] for t in morphotags])
-    return instances, vocab_counter
+                if options.flat_morphotags:
+                    mtags.append([mt2i[t] for t in morphotags])
+                else:
+                    mtags.append([mt2i[k][v] for (k,v) in morphotags])
+    return instances, vocab_counter, mt2ictr
 
 # def read_file(filename, w2i, t2i):
 #     instances = []
@@ -119,6 +131,7 @@ parser.add_argument("--dev-data", required=True, dest="dev_data", help="Developm
 parser.add_argument("--test-data", required=True, dest="test_data", help="Test data .txt file")
 parser.add_argument("--ud-tags", dest="ud_tags", action="store_true", help="Extract UD tags instead of original tags")
 parser.add_argument("--morphotags", dest="morphotags", default=False, help="Add morphosyntactic tags to dataset")
+parser.add_argument("--flat-morphotags", dest="flat_morphotags", default=False, help="Morphosyntactic tags are flattened to single features")
 parser.add_argument("--morpheme-segmentations", dest="morpheme_segmentations", help="Morpheme segmentations file")
 parser.add_argument("-o", required=True, dest="output", help="Output filename (.pkl)")
 parser.add_argument("--vocab-file", dest="vocab_file", default="vocab.txt", help="Text file containing all of the words in \
@@ -130,10 +143,11 @@ w2i = {} # mapping from word to index
 t2i = {} # mapping from POS tag to index
 mt2i = {} # mapping from Morphosyntactic tag name + value to index (TODO: also allow nested mapping)
 c2i = {}
+mt2ictr = 0
 output = {}
-output["training_instances"], output["training_vocab"] = read_file(options.training_data, w2i, t2i, mt2i, c2i)
-output["dev_instances"], output["dev_vocab"] = read_file(options.dev_data, w2i, t2i, mt2i, c2i)
-output["test_instances"], output["test_vocab"] = read_file(options.test_data, w2i, t2i, mt2i, c2i)
+output["training_instances"], output["training_vocab"], mt2ictr = read_file(options.training_data, w2i, t2i, mt2i, c2i, mt2ictr)
+output["dev_instances"], output["dev_vocab"], mt2ictr = read_file(options.dev_data, w2i, t2i, mt2i, c2i, mt2ictr)
+output["test_instances"], output["test_vocab"], mt2ictr = read_file(options.test_data, w2i, t2i, mt2i, c2i, mt2ictr)
 if options.morpheme_segmentations is not None:
     m2i = {}
     output["morpheme_segmentations"] = read_morpheme_segmentations(options.morpheme_segmentations, w2i, m2i)
@@ -149,6 +163,7 @@ output["w2i"] = w2i
 output["t2i"] = t2i
 output["c2i"] = c2i
 output["mt2i"] = mt2i
+output["mt_ctr"] = mt2ictr
 
 with open(options.output, "w") as outfile:
     cPickle.dump(output, outfile)
