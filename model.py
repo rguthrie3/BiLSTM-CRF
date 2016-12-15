@@ -16,9 +16,9 @@ Instance = collections.namedtuple("Instance", ["sentence", "tags", "mtags"])
 
 class BiLSTM_CRF:
 
-    def __init__(self, tagset_size, num_lstm_layers, hidden_dim, word_embeddings, morpheme_embeddings, morpheme_projection, morpheme_decomps, train_vocab_ctr):
+    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, morpheme_embeddings, morpheme_projection, morpheme_decomps, train_vocab_ctr):
         self.model = dy.Model()
-        self.tagset_size = tagset_size
+        self.tagset_sizes = tagset_sizes
         self.train_vocab_ctr = train_vocab_ctr
 
         # Word embedding parameters
@@ -43,14 +43,21 @@ class BiLSTM_CRF:
         # LSTM parameters
         self.bi_lstm = dy.BiRNNBuilder(num_lstm_layers, word_embedding_dim, hidden_dim, self.model, dy.LSTMBuilder)
         
-        # Matrix that maps from Bi-LSTM output to num tags
-        self.lstm_to_tags_params = self.model.add_parameters((tagset_size, hidden_dim))
-        self.lstm_to_tags_bias = self.model.add_parameters(tagset_size)
-        self.mlp_out = self.model.add_parameters((tagset_size, tagset_size))
-        self.mlp_out_bias = self.model.add_parameters(tagset_size)
-
-        # Transition matrix for tagging layer, [i,j] is score of transitioning to i from j
-        self.transitions = self.model.add_lookup_parameters((tagset_size, tagset_size))
+        self.attributes = tagset_sizes.keys()
+        self.lstm_to_tags_params = {}
+        self.lstm_to_tags_bias = {}
+        self.mlp_out = {}
+        self.mlp_out_bias = {}
+        self.transitions = {}
+        for attribute, set_size in tagset_sizes:
+            # Matrix that maps from Bi-LSTM output to num tags
+            self.lstm_to_tags_params[attribute] = self.model.add_parameters((set_size, hidden_dim))
+            self.lstm_to_tags_bias[attribute] = self.model.add_parameters(set_size)
+            self.mlp_out[attribute] = self.model.add_parameters((set_size, set_size))
+            self.mlp_out_bias[attribute] = self.model.add_parameters(set_size)
+    
+            # Transition matrix for tagging layer, [i,j] is score of transitioning to i from j
+            self.transitions = self.model.add_lookup_parameters((set_size, set_size))
 
 
     def set_dropout(self, p):
@@ -93,14 +100,16 @@ class BiLSTM_CRF:
 
         lstm_out = self.bi_lstm.transduce(embeddings)
         
-        H = dy.parameter(self.lstm_to_tags_params)
-        Hb = dy.parameter(self.lstm_to_tags_bias)
-        O = dy.parameter(self.mlp_out)
-        Ob = dy.parameter(self.mlp_out_bias)
-        scores = []
-        for rep in lstm_out:
-            score_t = O * dy.tanh(H * rep + Hb) + Ob
-            scores.append(score_t)
+        scores, H, Hb, O, Ob = {}
+        for att in self.attributes:
+            H[att] = dy.parameter(self.lstm_to_tags_params[att])
+            Hb[att] = dy.parameter(self.lstm_to_tags_bias[att])
+            O[att] = dy.parameter(self.mlp_out[att])
+            Ob[att] = dy.parameter(self.mlp_out_bias[att])
+            scores[att] = []
+            for rep in lstm_out:
+                score_t = O[att] * dy.tanh(H[att] * rep + Hb[att]) + Ob[att]
+                scores[att].append(score_t)
 
         return scores
 
@@ -140,16 +149,16 @@ class BiLSTM_CRF:
             npval = scores.npvalue()
             argmax_score = np.argmax(npval)
             max_score_expr = dy.pick(scores, argmax_score)
-            max_score_expr_broadcast = dy.concatenate([max_score_expr] * self.tagset_size)
+            max_score_expr_broadcast = dy.concatenate([max_score_expr] * self.tagset_sizes)
             return max_score_expr + dy.log(dy.sum_cols(dy.transpose(dy.exp(scores - max_score_expr_broadcast))))
 
-        init_alphas = [-1e10] * self.tagset_size
+        init_alphas = [-1e10] * self.tagset_sizes
         init_alphas[t2i["<START>"]] = 0
         for_expr = dy.inputVector(init_alphas)
         for obs in observations:
             alphas_t = []
-            for next_tag in range(self.tagset_size):
-                obs_broadcast = dy.concatenate([dy.pick(obs, next_tag)] * self.tagset_size)
+            for next_tag in range(self.tagset_sizes):
+                obs_broadcast = dy.concatenate([dy.pick(obs, next_tag)] * self.tagset_sizes)
                 next_tag_expr = for_expr + self.transitions[next_tag] + obs_broadcast
                 alphas_t.append(log_sum_exp(next_tag_expr))
             for_expr = dy.concatenate(alphas_t)
@@ -160,14 +169,14 @@ class BiLSTM_CRF:
 
     def viterbi_decoding(self, observations):
         backpointers = []
-        init_vvars   = [-1e10] * self.tagset_size
+        init_vvars   = [-1e10] * self.tagset_sizes
         init_vvars[t2i["<START>"]] = 0 # <Start> has all the probability
         for_expr     = dy.inputVector(init_vvars)
-        trans_exprs  = [self.transitions[idx] for idx in range(self.tagset_size)]
+        trans_exprs  = [self.transitions[idx] for idx in range(self.tagset_sizes)]
         for obs in observations:
             bptrs_t = []
             vvars_t = []
-            for next_tag in range(self.tagset_size):
+            for next_tag in range(self.tagset_sizes):
                 next_tag_expr = for_expr + trans_exprs[next_tag]
                 next_tag_arr = next_tag_expr.npvalue()
                 best_tag_id  = np.argmax(next_tag_arr)
@@ -201,7 +210,7 @@ class LSTMTagger:
 
     def __init__(self, tagset_size, num_lstm_layers, hidden_dim, word_embeddings, train_vocab_ctr, use_char_rnn, charset_size, vocab_size=None, word_embedding_dim=None):
         self.model = dy.Model()
-        self.tagset_size = tagset_size
+        self.tagset_sizes = tagset_size
         self.train_vocab_ctr = train_vocab_ctr
 
         if word_embeddings is not None: # Use pretrained embeddings
@@ -347,13 +356,17 @@ w2i = dataset["w2i"]
 t2i = dataset["t2i"]
 c2i = dataset["c2i"]
 mt2i = dataset["mt2i"]
+mt_ctr = dataset["mt_ctr"]
 #m2i = dataset["m2i"]
 m2i = None
 i2w = { i: w for w, i in w2i.items() } # Inverse mapping
 i2t = { i: t for t, i in t2i.items() }
 i2c = { i: c for c, i in c2i.items() }
-i2mt = { i: mt for mt, i in mt2i.items() }
-
+if mt_ctr == 0: # flat morphotag hierarchy
+    i2mt = { i: mt for mt, i in mt2i.items() }
+else:
+    i2mt = { i: (x,y) for x, vals in mt2i.items() for y, i in vals.items() }
+    
 tag_list = [ i2t[idx] for idx in xrange(len(i2t)) ] # To use in the confusion matrix
 mtag_list = [ i2mt[idx] for idx in xrange(len(i2mt)) ] # because why not
 training_instances = dataset["training_instances"]

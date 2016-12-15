@@ -141,7 +141,7 @@ options = parser.parse_args()
 
 w2i = {} # mapping from word to index
 t2i = {} # mapping from POS tag to index
-mt2i = {} # mapping from Morphosyntactic tag name + value to index (TODO: also allow nested mapping)
+mt2i = {} # mapping from Morphosyntactic tag name + value to index
 c2i = {}
 mt2ictr = 0
 output = {}
