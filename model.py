@@ -191,16 +191,18 @@ class BiLSTM_CRF:
         return alpha
 
 
-    def viterbi_decoding(self, observations):
+    def viterbi_decoding(self, observations, att):
+        t2i = t2is[att]
+        tagset_size = self.tagset_sizes[att]
         backpointers = []
-        init_vvars   = [-1e10] * self.tagset_sizes
+        init_vvars   = [-1e10] * tagset_size
         init_vvars[t2i["<START>"]] = 0 # <Start> has all the probability
         for_expr     = dy.inputVector(init_vvars)
-        trans_exprs  = [self.transitions[idx] for idx in range(self.tagset_sizes)]
+        trans_exprs  = [self.transitions[att][idx] for idx in range(tagset_size)]
         for obs in observations:
             bptrs_t = []
             vvars_t = []
-            for next_tag in range(self.tagset_sizes):
+            for next_tag in range(tagset_size):
                 next_tag_expr = for_expr + trans_exprs[next_tag]
                 next_tag_arr = next_tag_expr.npvalue()
                 best_tag_id  = np.argmax(next_tag_arr)
@@ -523,6 +525,7 @@ for epoch in xrange(int(options.num_epochs)):
                 if att not in instance.tags:
                     gold_tags[att] = [t2is[att]["<NONE>"]] * len(instance.sentence)
             losses = model.neg_log_loss(instance.sentence, gold_tags)
+            total_loss = sum([l.value() for l in losses]) / len(instance.sentence)
             _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
             dl = 0.0
             dev_writer.write("\n"
@@ -531,9 +534,7 @@ for epoch in xrange(int(options.num_epochs)):
                                                                          ["|".join(att + "=" + i2ts[att][v] for att,vals in out_tags_set.items() for v in vals)])])
                              + "\n")
             for att, tags in gold_tags.items():
-                loss = losses[att]
                 out_tags = out_tags_set[att]
-                dl += (loss.value() / len(instance.sentence))
                 correct_sent = True
     
                 for word, gold, out in zip(instance.sentence, tags, out_tags):
@@ -555,7 +556,7 @@ for epoch in xrange(int(options.num_epochs)):
                 #     logging.info( "\n\n\n" )
                 dev_total[att] += len(tags)
                 
-            dev_loss += (dl / len(gold_tags))
+            dev_loss += (total_loss / len(gold_tags))
 
     if options.viterbi:
         for att in t2is.keys():
