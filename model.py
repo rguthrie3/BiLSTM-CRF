@@ -530,7 +530,7 @@ for epoch in xrange(int(options.num_epochs)):
             dl = 0.0
             dev_writer.write("\n"
                              +"\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
-                                                                         ["|".join(att + "=" + i2ts[att][v] for att,vals in instance.tags.items()) for v in vals],
+                                                                         ["|".join(att + "=" + i2ts[att][v] for att,vals in gold_tags.items()) for v in vals],
                                                                          ["|".join(att + "=" + i2ts[att][v] for att,vals in out_tags_set.items()) for v in vals])])
                              + "\n")
             for att, tags in gold_tags.items():
