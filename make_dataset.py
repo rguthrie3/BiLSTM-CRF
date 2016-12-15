@@ -12,6 +12,7 @@ dev_instances
 test_instances
 w2i: Dict mapping words to indices
 t2i: Dict mapping tags to indices
+mt2i: Dict mapping morphotags to indices
 c2i: Dict mapping characters to indices
 """
 
@@ -43,7 +44,7 @@ def read_morpheme_segmentations(filename, w2i, m2i):
 def read_file(filename, w2i, t2i, mt2i, c2i):
     """
     Read in a dataset and turn it into a list of instances.
-    Modifies the w2i, t2i and c2i dicts, adding new words/tags/chars 
+    Modifies the w2i, t2i, mt2i and c2i dicts, adding new words/tags/chars 
     as it sees them.
     """
     instances = []
