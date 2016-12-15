@@ -52,7 +52,7 @@ class BiLSTM_CRF:
         self.mlp_out = {}
         self.mlp_out_bias = {}
         self.transitions = {}
-        for attribute, set_size in tagset_sizes:
+        for attribute, set_size in tagset_sizes.items():
             # Matrix that maps from Bi-LSTM output to num tags
             self.lstm_to_tags_params[attribute] = self.model.add_parameters((set_size, hidden_dim))
             self.lstm_to_tags_bias[attribute] = self.model.add_parameters(set_size)
@@ -103,7 +103,11 @@ class BiLSTM_CRF:
 
         lstm_out = self.bi_lstm.transduce(embeddings)
         
-        scores, H, Hb, O, Ob = {}
+	scores = {}
+        H = {}
+        Hb = {}
+        O = {}
+        Ob = {}
         for att in self.attributes:
             H[att] = dy.parameter(self.lstm_to_tags_params[att])
             Hb[att] = dy.parameter(self.lstm_to_tags_bias[att])
@@ -118,8 +122,10 @@ class BiLSTM_CRF:
 
 
     def score_sentence(self, observations, tags, att):
-        assert len(observations) == len(tags)
         t2i = t2is[att]
+        if len(tags) == 0:
+            tags = [t2i["<NONE>"]] * len(observations)
+        assert len(observations) == len(tags)
         trans = self.transitions[att]
         score_seq = [0]
         score = dy.scalarInput(0)
@@ -133,7 +139,8 @@ class BiLSTM_CRF:
 
     def viterbi_loss(self, sentence, tags_set):
         observations_set = self.build_tagging_graph(sentence)
-        losses = ret_tags = {}
+        losses = {}
+        ret_tags = {}
         for att, observations in observations_set.items():
             tags = tags_set[att]
             viterbi_tags, viterbi_score = self.viterbi_decoding(observations, att)
@@ -150,8 +157,8 @@ class BiLSTM_CRF:
     def neg_log_loss(self, sentence, tags):
         observations_set = self.build_tagging_graph(sentence)
         scores = {}
-        for att, observations in observations_set:
-            gold_score = self.score_sentence(observations, tags, att)
+        for att, observations in observations_set.items():
+            gold_score = self.score_sentence(observations, tags[att], att)
             forward_score = self.forward(observations, att)
             scores[att] = forward_score - gold_score
         return scores
@@ -159,11 +166,11 @@ class BiLSTM_CRF:
 
     def forward(self, observations, att):
 
-        def log_sum_exp(scores):
+        def log_sum_exp(scores, tagset_size):
             npval = scores.npvalue()
             argmax_score = np.argmax(npval)
             max_score_expr = dy.pick(scores, argmax_score)
-            max_score_expr_broadcast = dy.concatenate([max_score_expr] * self.tagset_sizes)
+            max_score_expr_broadcast = dy.concatenate([max_score_expr] * tagset_size)
             return max_score_expr + dy.log(dy.sum_cols(dy.transpose(dy.exp(scores - max_score_expr_broadcast))))
 
         t2i = t2is[att]
@@ -177,10 +184,10 @@ class BiLSTM_CRF:
             for next_tag in range(tagset_size):
                 obs_broadcast = dy.concatenate([dy.pick(obs, next_tag)] * tagset_size)
                 next_tag_expr = for_expr + trans[next_tag] + obs_broadcast
-                alphas_t.append(log_sum_exp(next_tag_expr))
+                alphas_t.append(log_sum_exp(next_tag_expr, tagset_size))
             for_expr = dy.concatenate(alphas_t)
         terminal_expr = for_expr + trans[t2i["<STOP>"]]
-        alpha = log_sum_exp(terminal_expr)
+        alpha = log_sum_exp(terminal_expr, tagset_size)
         return alpha
 
 
@@ -222,7 +229,7 @@ class BiLSTM_CRF:
         return self.model
 
 
-
+# TODO support multi-attribute tagging
 class LSTMTagger:
 
     def __init__(self, tagset_size, num_lstm_layers, hidden_dim, word_embeddings, train_vocab_ctr, use_char_rnn, charset_size, vocab_size=None, word_embedding_dim=None):
@@ -452,7 +459,7 @@ for epoch in xrange(int(options.num_epochs)):
             loss = 0
             loss_exprs, viterbi_tags_set = model.viterbi_loss(instance.sentence, instance.tags)
             # TODO handle cases of failed precision (predicted tags that have all-zeros in gold)
-            for att, tags in instance.tags:
+            for att, tags in instance.tags.items():
                 if att not in viterbi_tags_set:
                     # attribute not predicted at all, still "none"s are correct
                     train_correct[att] += tags.count(t2is[att]["<NONE>"]) # TODO later remove or make into own cat
@@ -478,7 +485,7 @@ for epoch in xrange(int(options.num_epochs)):
         else:
             loss_exprs = model.neg_log_loss(instance.sentence, instance.tags)
             # TODO parametrize and allow other formulations
-            loss_expr = dy.average(loss_exprs)
+            loss_expr = dy.average(loss_exprs.values())
             loss = loss_expr.scalar_value()
 
         # Bail if loss is NaN
@@ -519,7 +526,7 @@ for epoch in xrange(int(options.num_epochs)):
             dev_writer.write("\n"
                              +"\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
                                                                          ["|".join(att + "=" + i2ts[att][v] for att,vals in instance.tags.items() for v in vals)],
-                                                                         ["|".join(att + "=" + i2ts[att][v] for att,vals in out_tags_set for v in vals)])])
+                                                                         ["|".join(att + "=" + i2ts[att][v] for att,vals in out_tags_set.items() for v in vals)])])
                              + "\n")
             for att, tags in instance.tags.items():
                 loss = losses[att]
