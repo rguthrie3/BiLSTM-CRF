@@ -52,7 +52,7 @@ def read_file(filename, w2i, t2is, c2i):
     if "POS" not in t2is:
         t2is["POS"] = {}
     if options.flat_morphotags and "MORPH" not in t2is:
-        t2is["MORPH"] = {"NONE":0}
+        t2is["MORPH"] = {"<NONE>":0}
     
     instances = []
     vocab_counter = collections.Counter()
@@ -95,14 +95,14 @@ def read_file(filename, w2i, t2is, c2i):
                 else:
                     for key, val in morphotags.items():
                         if key not in t2is:
-                            t2is[key] = {"NONE":0}
+                            t2is[key] = {"<NONE>":0}
                         mt2i = t2is[key]
                         if val not in mt2i:
                             mt2i[val] = len(mt2i)
                 sentence.append(w2i[word])
-                tags["POS"].append(t2i[postag])
+                tags["POS"].append(t2is["POS"][postag])
                 if options.flat_morphotags:
-                    tags["MORPH"].append([mt2i[t] for t in morphotags.items()])
+                    tags["MORPH"].append([t2is["MORPH"][t] for t in morphotags.items()])
                 else:
                     for k,v in morphotags.items():
                         mtags = tags[k]
@@ -168,7 +168,7 @@ if options.morpheme_segmentations is not None:
 
 # Add special tokens / tags / chars to dicts
 w2i["<UNK>"] = len(w2i)
-for t2i in t2is:
+for t2i in t2is.values():
     t2i["<START>"] = len(t2i)
     t2i["<STOP>"] = len(t2i)
 c2i["<*>"] = len(c2i) # padding char
