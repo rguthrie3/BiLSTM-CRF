@@ -553,6 +553,8 @@ for epoch in xrange(int(options.num_epochs)):
             losses = model.neg_log_loss(instance.sentence, gold_tags)
             if options.loss_aggregation == "average":
                 total_loss = sum([l.value() for l in losses.values()]) / len(losses)
+            elif options.loss_aggregation == "max":
+                total_loss = max([l.value() for l in losses.values()])
             elif options.loss_aggregation == "min":
                 total_loss = min([l.value() for l in losses.values()])
             _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
