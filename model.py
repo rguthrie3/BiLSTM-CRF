@@ -14,6 +14,7 @@ import numpy as np
 
 import utils
 
+
 Instance = collections.namedtuple("Instance", ["sentence", "tags"])
 
 
@@ -345,6 +346,7 @@ parser.add_argument("--no-sequence-model", dest="no_sequence_model", action="sto
 parser.add_argument("--use-char-rnn", dest="use_char_rnn", action="store_true", help="Use character RNN")
 parser.add_argument("--log-dir", default="log", dest="log_dir", help="Directory where to write logs / serialized models")
 parser.add_argument("--dev-output", default="dev-out", dest="dev_output", help="File with output examples")
+parser.add_argument("--pos-separate-col", default=True, dest="pos_separate_col", help="Output examples have POS in separate column")
 options = parser.parse_args()
 
 
@@ -529,12 +531,10 @@ for epoch in xrange(int(options.num_epochs)):
             total_loss = sum([l.value() for l in losses.values()]) / len(instance.sentence)
             _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
             dl = 0.0
-            senlen = len(instance.sentence)
-            keylen = len(model.attributes)
             dev_writer.write("\n"
                              + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
-                                                                         ["|".join([(gold_tags.keys()[i] + "=" + i2ts[gold_tags.keys()[i]][gold_tags[gold_tags.keys()[i]][j]]) for i in xrange(keylen) if i2ts[gold_tags.keys()[i]][gold_tags[gold_tags.keys()[i]][j]] != "<NONE>"]) for j in xrange(senlen)],
-                                                                         ["|".join([(out_tags_set.keys()[i] + "=" + i2ts[out_tags_set.keys()[i]][out_tags_set[out_tags_set.keys()[i]][j]]) for i in xrange(keylen) if i2ts[out_tags_set.keys()[i]][out_tags_set[out_tags_set.keys()[i]][j]] != "<NONE>"]) for j in xrange(senlen)])])
+                                                                         utils.morphotag_string(i2ts, gold_tags, options.pos_separate_col),
+                                                                         utils.morphotag_string(i2ts, out_tags_set, options.pos_separate_col))])
                              + "\n")
             for att, tags in gold_tags.items():
                 out_tags = out_tags_set[att]
