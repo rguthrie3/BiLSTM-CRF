@@ -103,19 +103,19 @@ def split_tagstring(s, uni_key=False):
 
 
 def morphotag_string(i2ts, tag_mapping, pos_separate_col=True):
-    senlen = len(tag_mapping.keys()[0])
+    senlen = len(tag_mapping.values()[0])
     key_value_strs = []
     
     # j iterates along sentence, as we're building the string representations
     # in the opposite orientation as the mapping
     for j in xrange(senlen): 
         place_strs = []
-        for tag, seq in tag_mapping.items():
-            val = i2ts[tag][seq[j]]
-            if pos_separate_col and tag == "POS":
+        for att, seq in tag_mapping.items():
+            val = i2ts[att][seq[j]]
+            if pos_separate_col and att == "POS":
                 pos_str = val
             elif val != "<NONE>":
-                place_strs.append(tag + "=" + val)
+                place_strs.append(att + "=" + val)
         morpho_str = "|".join(place_strs)
         if pos_separate_col:
             key_value_strs.append(pos_str + "\t" + morpho_str)
