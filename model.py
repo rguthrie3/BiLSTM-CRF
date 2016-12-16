@@ -104,7 +104,7 @@ class BiLSTM_CRF:
 
         lstm_out = self.bi_lstm.transduce(embeddings)
         
-	scores = {}
+        scores = {}
         H = {}
         Hb = {}
         O = {}
@@ -342,11 +342,13 @@ parser.add_argument("--hidden-dim", default=128, dest="hidden_dim", type=int, he
 parser.add_argument("--learning-rate", default=0.01, dest="learning_rate", type=float, help="Initial learning rate")
 parser.add_argument("--dropout", default=-1, dest="dropout", type=float, help="Amount of dropout to apply to LSTM part of graph")
 parser.add_argument("--viterbi", dest="viterbi", action="store_true", help="Use viterbi training instead of CRF")
+parser.add_argument("--loss-aggregation", default="average", dest="loss_aggregation", help="Aggregation method for loss function in multi-attribute tagging. Supported values - average (default), min, max")
 parser.add_argument("--no-sequence-model", dest="no_sequence_model", action="store_true", help="Use regular LSTM tagger with no viterbi")
 parser.add_argument("--use-char-rnn", dest="use_char_rnn", action="store_true", help="Use character RNN")
 parser.add_argument("--log-dir", default="log", dest="log_dir", help="Directory where to write logs / serialized models")
 parser.add_argument("--dev-output", default="dev-out", dest="dev_output", help="File with output examples")
 parser.add_argument("--pos-separate-col", default=True, dest="pos_separate_col", help="Output examples have POS in separate column")
+parser.add_argument("--debug", dest="debug", action="store_true", help="Debug mode")
 options = parser.parse_args()
 
 
@@ -372,10 +374,13 @@ LSTM: {} layers, {} hidden dim
 Initial Learning Rate: {}
 Dropout: {}
 Objective: {}
+Multi-attribute loss aggregation: {}
 
 """.format(options.dataset, options.word_embeddings, options.num_epochs, options.lstm_layers, options.hidden_dim,
-           options.learning_rate, options.dropout, "Viterbi" if options.viterbi else "CRF"))
+           options.learning_rate, options.dropout, "Viterbi" if options.viterbi else "CRF", options.loss_aggregation))
 
+if options.debug:
+    print "DEBUG MODE"
 
 # ===-----------------------------------------------------------------------===
 # Read in dataset
@@ -455,13 +460,17 @@ for epoch in xrange(int(options.num_epochs)):
     if options.dropout > 0:
         model.set_dropout(options.dropout)
 
-    for instance in bar(training_instances): # for real
-    # for instance in bar(training_instances[0:int(len(training_instances)/20)]): # for dev
+    if options.debug:
+        train_instances = training_instances[0:int(len(training_instances)/20)]
+    else:
+        train_instances = training_instances
+    
+    for instance in bar(train_instances):
         if len(instance.sentence) == 0: continue
 
         # TODO make the interface all the same here
         if options.viterbi:
-            loss = 0
+            losses = []
             gold_tags = instance.tags
             for att in model.attributes:
                 if att not in instance.tags:
@@ -478,17 +487,30 @@ for epoch in xrange(int(options.num_epochs)):
                 else:
                     train_correct[att] += len(tags)
                 train_total[att] += len(tags)
-                loss += l
-            # TODO this is average. parametrize and allow other formulations
-            loss /= len(gold_tags)
-            loss_expr = dy.average(loss_exprs.values())
+                losses.append(l)
+            if options.loss_aggregation == "average":
+                loss = sum(losses) / len(losses)
+                loss_expr = dy.average(loss_exprs.values())
+            elif options.loss_aggregation == "max":
+                loss = max(losses)
+                loss_expr = max(loss_exprs.values())
+            elif options.loss_aggregation == "min":
+                loss = min(losses)
+                loss_expr = min(loss_exprs.values())
         elif options.no_sequence_model:
+            # no support for multi-attr labeling in LSTMTagger yet (existing TODO)
             loss_expr = model.loss(instance.sentence, instance.tags)
             loss = loss_expr.scalar_value()
         else:
             loss_exprs = model.neg_log_loss(instance.sentence, instance.tags)
-            # TODO parametrize and allow other formulations
-            loss_expr = dy.average(loss_exprs.values())
+            if options.debug:
+                print "Average: {}, Max: {}, Min: {} on {} expressions".format(dy.average(loss_exprs.values()), max(loss_exprs.values()), min(loss_exprs.values()), len(loss_exprs))
+            if options.loss_aggregation == "average":
+                loss_expr = dy.average(loss_exprs.values())
+            elif options.loss_aggregation == "max":
+                loss_expr = max(loss_exprs.values())
+            elif options.loss_aggregation == "min":
+                loss_expr = min(loss_exprs.values())
             loss = loss_expr.scalar_value()
 
         # Bail if loss is NaN
@@ -515,10 +537,11 @@ for epoch in xrange(int(options.num_epochs)):
     bar = progressbar.ProgressBar()
     total_wrong = Counter()
     total_wrong_oov = Counter()
-    dev_writer.write("\nepoch " + str(epoch) + "\n")
+    dev_writer.write("\nepoch " + str(epoch + 1) + "\n")
     for instance in bar(dev_instances):
         if len(instance.sentence) == 0: continue
         if options.no_sequence_model:
+            # no support for multi-attr labeling in LSTMTagger yet (existing TODO)
             loss = model.loss(instance.sentence, instance.tags)
             dev_loss += (loss.scalar_value() / len(instance.sentence))
             out_tags = model.tag_sentence(instance.sentence)
@@ -528,7 +551,10 @@ for epoch in xrange(int(options.num_epochs)):
                 if att not in instance.tags:
                     gold_tags[att] = [t2is[att]["<NONE>"]] * len(instance.sentence)
             losses = model.neg_log_loss(instance.sentence, gold_tags)
-            total_loss = sum([l.value() for l in losses.values()]) / len(instance.sentence)
+            if options.loss_aggregation == "average":
+                total_loss = sum([l.value() for l in losses.values()]) / len(losses)
+            elif options.loss_aggregation == "min":
+                total_loss = min([l.value() for l in losses.values()])
             _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
             dl = 0.0
             dev_writer.write("\n"
@@ -537,6 +563,7 @@ for epoch in xrange(int(options.num_epochs)):
                                                                          utils.morphotag_string(i2ts, out_tags_set, options.pos_separate_col))])
                              + "\n")
             for att, tags in gold_tags.items():
+                # TODO add f1 reporting (infrastructure in evaluate_morphotags.py)
                 out_tags = out_tags_set[att]
                 correct_sent = True
     
@@ -559,7 +586,7 @@ for epoch in xrange(int(options.num_epochs)):
                 #     logging.info( "\n\n\n" )
                 dev_total[att] += len(tags)
                 
-            dev_loss += (total_loss / len(gold_tags))
+            dev_loss += (total_loss / len(instance.sentence))
 
     if options.viterbi:
         for att in t2is.keys():
