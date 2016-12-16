@@ -453,7 +453,8 @@ for epoch in xrange(int(options.num_epochs)):
     if options.dropout > 0:
         model.set_dropout(options.dropout)
 
-    for instance in bar(training_instances):
+    for instance in bar(training_instances): # for real
+    # for instance in bar(training_instances[0:int(len(training_instances)/20)]): # for dev
         if len(instance.sentence) == 0: continue
 
         # TODO make the interface all the same here
@@ -525,13 +526,15 @@ for epoch in xrange(int(options.num_epochs)):
                 if att not in instance.tags:
                     gold_tags[att] = [t2is[att]["<NONE>"]] * len(instance.sentence)
             losses = model.neg_log_loss(instance.sentence, gold_tags)
-            total_loss = sum([l.value() for l in losses]) / len(instance.sentence)
+            total_loss = sum([l.value() for l in losses.values()]) / len(instance.sentence)
             _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
             dl = 0.0
+            senlen = len(instance.sentence)
+            keylen = len(model.attributes)
             dev_writer.write("\n"
-                             +"\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
-                                                                         ["|".join(att + "=" + i2ts[att][v] for att,vals in gold_tags.items()) for v in vals],
-                                                                         ["|".join(att + "=" + i2ts[att][v] for att,vals in out_tags_set.items()) for v in vals])])
+                             + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
+                                                                         ["|".join([(gold_tags.keys()[i] + "=" + i2ts[gold_tags.keys()[i]][gold_tags[gold_tags.keys()[i]][j]]) for i in xrange(keylen) if i2ts[gold_tags.keys()[i]][gold_tags[gold_tags.keys()[i]][j]] != "<NONE>"]) for j in xrange(senlen)],
+                                                                         ["|".join([(out_tags_set.keys()[i] + "=" + i2ts[out_tags_set.keys()[i]][out_tags_set[out_tags_set.keys()[i]][j]]) for i in xrange(keylen) if i2ts[out_tags_set.keys()[i]][out_tags_set[out_tags_set.keys()[i]][j]] != "<NONE>"]) for j in xrange(senlen)])])
                              + "\n")
             for att, tags in gold_tags.items():
                 out_tags = out_tags_set[att]
