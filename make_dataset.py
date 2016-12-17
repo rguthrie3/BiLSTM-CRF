@@ -145,7 +145,7 @@ parser.add_argument("--training-data", required=True, dest="training_data", help
 parser.add_argument("--dev-data", required=True, dest="dev_data", help="Development data .txt file")
 parser.add_argument("--test-data", required=True, dest="test_data", help="Test data .txt file")
 parser.add_argument("--ud-tags", dest="ud_tags", action="store_true", help="Extract UD tags instead of original tags")
-parser.add_argument("--morphotags", dest="morphotags", default=False, help="Add morphosyntactic tags to dataset")
+parser.add_argument("--morphotags", dest="morphotags", action="store_true", help="Add morphosyntactic tags to dataset")
 parser.add_argument("--flat-morphotags", dest="flat_morphotags", default=False, help="Morphosyntactic tags are flattened to single features")
 parser.add_argument("--morpheme-segmentations", dest="morpheme_segmentations", help="Morpheme segmentations file")
 parser.add_argument("-o", required=True, dest="output", help="Output filename (.pkl)")
