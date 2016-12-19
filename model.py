@@ -595,15 +595,13 @@ for epoch in xrange(int(options.num_epochs)):
             dev_loss += (total_loss / len(instance.sentence))
 
     if options.viterbi:
-        for att in t2is.keys():
-            logging.info("{} Train Accuracy: {}".format(att, train_correct[att] / train_total[att]))
+        logging.info("POS Train Accuracy: {}".format(train_correct["POS"] / train_total["POS"]))
+    logging.info("POS Dev Accuracy: {}".format(dev_correct["POS"] / dev_total["POS"]))
+    logging.info("POS % OOV accuracy: {}".format((dev_oov_total["POS"] - total_wrong_oov["POS"]) / dev_oov_total["POS"]))
+    if total_wrong["POS"] > 0:
+        logging.info("POS % Wrong that are OOV: {}".format(total_wrong_oov["POS"] / total_wrong["POS"]))
     for attr in t2is.keys():
-        if attr == "POS":
-            logging.info("{} Dev Accuracy: {}".format(attr, dev_correct[attr] / dev_total[attr]))
-            logging.info("{} % OOV accuracy: {}".format(attr, (dev_oov_total[attr] - total_wrong_oov[attr]) / dev_oov_total[attr]))
-            if total_wrong[attr] > 0:
-                logging.info("{} % Wrong that are OOV: {}".format(attr, total_wrong_oov[attr] / total_wrong[attr]))
-        else:
+        if attr != "POS":
             logging.info("{} F1: {}".format(attr, f1_eval.mic_f1(att = attr)))
     logging.info("Total attribute F1s: {} micro, {} macro, POS included = {}".format(f1_eval.mic_f1(), f1_eval.mac_f1(), not options.pos_separate_col))
 

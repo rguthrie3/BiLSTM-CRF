@@ -84,7 +84,7 @@ class Evaluator(object):
     
     def acc(self):
         '''
-        Accuracy
+        Accuracy for 'exact_match' mode
         '''
         if self.instance_count <= 0:
             return 0.0
