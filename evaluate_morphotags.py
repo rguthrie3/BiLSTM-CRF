@@ -67,7 +67,7 @@ class Evaluator(object):
         @param att get f1 for specific attribute (exact match)
         '''
         if att != None:
-            return f1(self.correct[att], self.gold[att], self.observed[att])
+            return f1(self.correct.get(att, 0), self.gold.get(att, 0), self.observed.get(att, 0))
         return f1(sum(self.correct.values()), sum(self.gold.values()), sum(self.observed.values()))
     
     def mac_f1(self, att = None):
