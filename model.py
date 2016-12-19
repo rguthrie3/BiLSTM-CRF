@@ -568,7 +568,7 @@ for epoch in xrange(int(options.num_epochs)):
                                                                          gold_strings, obs_strings)])
                              + "\n")
             for g, o in zip(gold_strings, obs_strings):
-                f1_eval.add_instance(g, o)
+                f1_eval.add_instance(utils.split_tagstring(g), utils.split_tagstring(o))
             for att, tags in gold_tags.items():
                 out_tags = out_tags_set[att]
                 correct_sent = True
@@ -597,13 +597,15 @@ for epoch in xrange(int(options.num_epochs)):
     if options.viterbi:
         for att in t2is.keys():
             logging.info("{} Train Accuracy: {}".format(att, train_correct[att] / train_total[att]))
-    with "POS" as att: # not to clutter
-    #for att in t2is.keys():
-        logging.info("{} Dev Accuracy: {}".format(att, dev_correct[att] / dev_total[att]))
-        logging.info("{} % OOV accuracy: {}".format(att, (dev_oov_total[att] - total_wrong_oov[att]) / dev_oov_total[att]))
-        if total_wrong[att] > 0:
-            logging.info("{} % Wrong that are OOV: {}".format(att, total_wrong_oov[att] / total_wrong[att]))
-    logging.info("Attribute F1s: {} micro, {} macro, POS included = {}".format(f1_eval.mic_f1(), f1_eval.mac_f1(), not options.pos_separate_col))
+    for attr in t2is.keys():
+        if attr == "POS":
+            logging.info("{} Dev Accuracy: {}".format(attr, dev_correct[attr] / dev_total[attr]))
+            logging.info("{} % OOV accuracy: {}".format(attr, (dev_oov_total[attr] - total_wrong_oov[attr]) / dev_oov_total[attr]))
+            if total_wrong[attr] > 0:
+                logging.info("{} % Wrong that are OOV: {}".format(attr, total_wrong_oov[attr] / total_wrong[attr]))
+        else:
+            logging.info("{} F1: {}".format(attr, f1_eval.mic_f1(att = attr)))
+    logging.info("Total attribute F1s: {} micro, {} macro, POS included = {}".format(f1_eval.mic_f1(), f1_eval.mac_f1(), not options.pos_separate_col))
 
     train_loss = train_loss / len(training_instances)
     dev_loss = dev_loss / len(dev_instances)

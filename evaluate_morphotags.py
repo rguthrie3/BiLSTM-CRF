@@ -9,7 +9,7 @@ from __future__ import division
 from numpy import average
 
 def f1(corr, gold, obs):
-    if gold <= 0 or obs <= 0:
+    if gold <= 0 or obs <= 0 or corr <= 0:
         return 0
     rec = corr / gold
     pre = corr / obs
@@ -61,14 +61,31 @@ class Evaluator(object):
         if self.mode == 'att_val':
             return (k,v)
     
-    def mic_f1(self):
+    def mic_f1(self, att = None):
+        '''
+        Micro F1
+        @param att get f1 for specific attribute (exact match)
+        '''
+        if att != None:
+            return f1(self.correct[att], self.gold[att], self.observed[att])
         return f1(sum(self.correct.values()), sum(self.gold.values()), sum(self.observed.values()))
     
-    def mac_f1(self):
+    def mac_f1(self, att = None):
+        '''
+        Macro F1
+        @param att only relevant in att_val mode, otherwise fails (use mic_f1)
+        '''
         all_keys = set().union(self.gold.keys(), self.observed.keys())
-        return average(map(lambda k : f1(self.correct.get(k, 0), self.gold.get(k, 0), self.observed.get(k, 0)), all_keys))
+        if att == None:
+            keys = all_keys
+        else:
+            keys = [k for k in all_keys if k[0] == att]
+        return average([f1(self.correct.get(k, 0), self.gold.get(k, 0), self.observed.get(k, 0)) for k in keys])
     
     def acc(self):
+        '''
+        Accuracy
+        '''
         if self.instance_count <= 0:
             return 0.0
         return self.exact_match / self.instance_count

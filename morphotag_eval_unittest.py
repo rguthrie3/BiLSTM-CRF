@@ -7,7 +7,9 @@ from __future__ import division
 import unittest
 from evaluate_morphotags import Evaluator
 from utils import split_tagstring
+from numpy import nan
 from numpy.testing.utils import assert_almost_equal
+from numpy.testing.utils import assert_equal
 
 class Test(unittest.TestCase):
 
@@ -26,8 +28,11 @@ class Test(unittest.TestCase):
                 
         assert_almost_equal(eval1.mic_f1(), 5/9)
         assert_almost_equal(eval1.mac_f1(), 13/30)
+        assert_almost_equal(eval1.mic_f1(att = "Number"), 2/5)
+        assert_equal(eval1.mac_f1(att = "Number"), nan)
         assert_almost_equal(eval2.mic_f1(), 5/9)
         assert_almost_equal(eval2.mac_f1(), 29/70)
+        assert_almost_equal(eval2.mac_f1(att = "Number"), 1/4)
         assert_almost_equal(eval3.acc(), 1/4)
 
 
