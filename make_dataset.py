@@ -67,6 +67,7 @@ def read_file(filename, w2i, t2is, c2i):
                 slen = len(sentence)
                 for seq in tags.values():
                     if len(seq) < slen:
+                        # pad to sentence end
                         seq.extend([0] * (slen - len(seq)))
                 instances.append(Instance(sentence, tags))
                 sentence = []
@@ -75,7 +76,8 @@ def read_file(filename, w2i, t2is, c2i):
                 data = line.split("\t")
                 if '-' in data[0]: # Italian has contractions on a separate line, we don't want to include them also
                     continue
-                word = data[1]
+                idx = int(data[0])
+                word = data[1]                
                 postag = data[3] if options.ud_tags else data[4]
                 morphotags = split_tagstring(data[5], uni_key=options.flat_morphotags) if options.morphotags else {}
                 vocab_counter[word] += 1
@@ -106,9 +108,9 @@ def read_file(filename, w2i, t2is, c2i):
                 else:
                     for k,v in morphotags.items():
                         mtags = tags[k]
-                        if len(mtags) == 0 and len(sentence) > 1:
-                            # tag not seen in sentence, need to pad backwards
-                            mtags.extend([0] * (len(sentence) - 1))                            
+                        # pad backwards to latest seen
+                        missing_tags = idx - len(mtags) - 1
+                        mtags.extend([0] * missing_tags)
                         mtags.append(t2is[k][v])
     return instances, vocab_counter
 
