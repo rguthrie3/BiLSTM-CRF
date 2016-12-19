@@ -102,7 +102,7 @@ def split_tagstring(s, uni_key=False):
     return ret
 
 
-def morphotag_string(i2ts, tag_mapping, pos_separate_col=True):
+def morphotag_strings(i2ts, tag_mapping, pos_separate_col=True):
     senlen = len(tag_mapping.values()[0])
     key_value_strs = []
     

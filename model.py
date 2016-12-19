@@ -1,5 +1,6 @@
 from __future__ import division
 from collections import Counter
+from evaluate_morphotags import Evaluator
 
 import collections
 import argparse
@@ -503,14 +504,14 @@ for epoch in xrange(int(options.num_epochs)):
             loss = loss_expr.scalar_value()
         else:
             loss_exprs = model.neg_log_loss(instance.sentence, instance.tags)
-            if options.debug:
-                print "Average: {}, Max: {}, Min: {} on {} expressions".format(dy.average(loss_exprs.values()), max(loss_exprs.values()), min(loss_exprs.values()), len(loss_exprs))
+            #if options.debug:
+            #    print "Average: {}, Max: {}, Min: {} on {} expressions".format(*([x.scalar_value() for x in [dy.average(loss_exprs.values()), dy.np.max(loss_exprs.values()), dy.np.min(loss_exprs.values())]] + [len(loss_exprs)]))
             if options.loss_aggregation == "average":
                 loss_expr = dy.average(loss_exprs.values())
             elif options.loss_aggregation == "max":
-                loss_expr = max(loss_exprs.values())
+                loss_expr = dy.Expression(dy.np.max(loss_exprs.values()))
             elif options.loss_aggregation == "min":
-                loss_expr = min(loss_exprs.values())
+                loss_expr = dy.Expression(dy.np.min(loss_exprs.values()))
             loss = loss_expr.scalar_value()
 
         # Bail if loss is NaN
@@ -537,6 +538,7 @@ for epoch in xrange(int(options.num_epochs)):
     bar = progressbar.ProgressBar()
     total_wrong = Counter()
     total_wrong_oov = Counter()
+    f1_eval = Evaluator(m = 'att')
     dev_writer.write("\nepoch " + str(epoch + 1) + "\n")
     for instance in bar(dev_instances):
         if len(instance.sentence) == 0: continue
@@ -559,13 +561,15 @@ for epoch in xrange(int(options.num_epochs)):
                 total_loss = min([l.value() for l in losses.values()])
             _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
             dl = 0.0
+            gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
+            obs_strings = utils.morphotag_strings(i2ts, out_tags_set, options.pos_separate_col)
             dev_writer.write("\n"
                              + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
-                                                                         utils.morphotag_string(i2ts, gold_tags, options.pos_separate_col),
-                                                                         utils.morphotag_string(i2ts, out_tags_set, options.pos_separate_col))])
+                                                                         gold_strings, obs_strings)])
                              + "\n")
+            for g, o in zip(gold_strings, obs_strings):
+                f1_eval.add_instance(g, o)
             for att, tags in gold_tags.items():
-                # TODO add f1 reporting (infrastructure in evaluate_morphotags.py)
                 out_tags = out_tags_set[att]
                 correct_sent = True
     
@@ -593,11 +597,13 @@ for epoch in xrange(int(options.num_epochs)):
     if options.viterbi:
         for att in t2is.keys():
             logging.info("{} Train Accuracy: {}".format(att, train_correct[att] / train_total[att]))
-    for att in t2is.keys():
+    with "POS" as att: # not to clutter
+    #for att in t2is.keys():
         logging.info("{} Dev Accuracy: {}".format(att, dev_correct[att] / dev_total[att]))
         logging.info("{} % OOV accuracy: {}".format(att, (dev_oov_total[att] - total_wrong_oov[att]) / dev_oov_total[att]))
         if total_wrong[att] > 0:
             logging.info("{} % Wrong that are OOV: {}".format(att, total_wrong_oov[att] / total_wrong[att]))
+    logging.info("Attribute F1s: {} micro, {} macro, POS included = {}".format(f1_eval.mic_f1(), f1_eval.mac_f1(), not options.pos_separate_col))
 
     train_loss = train_loss / len(training_instances)
     dev_loss = dev_loss / len(dev_instances)
