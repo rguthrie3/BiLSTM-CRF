@@ -539,7 +539,7 @@ for epoch in xrange(int(options.num_epochs)):
     total_wrong_oov = Counter()
     f1_eval = Evaluator(m = 'att')
     dev_ext = options.dev_output.rfind(".")
-    dev_writer = open(options.dev_output[:dev_ext] + "_{02d}".format(epoch + 1) + options.dev_output[dev_ext:], 'w')
+    dev_writer = open(options.dev_output[:dev_ext] + "_{:02d}".format(epoch + 1) + options.dev_output[dev_ext:], 'w')
     for instance in bar(dev_instances):
         if len(instance.sentence) == 0: continue
         if options.no_sequence_model:
