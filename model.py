@@ -233,14 +233,14 @@ class BiLSTM_CRF:
         return self.model
 
 
-# TODO support multi-attribute tagging
 class LSTMTagger:
 
-    def __init__(self, tagset_size, num_lstm_layers, hidden_dim, word_embeddings, train_vocab_ctr, use_char_rnn, charset_size, vocab_size=None, word_embedding_dim=None):
+    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, train_vocab_ctr, use_char_rnn, charset_size, vocab_size=None, word_embedding_dim=None):
         self.model = dy.Model()
-        self.tagset_size = tagset_size
+        self.tagset_sizes = tagset_sizes
         self.train_vocab_ctr = train_vocab_ctr
-
+        self.attributes = tagset_sizes.keys()
+        
         if word_embeddings is not None: # Use pretrained embeddings
             vocab_size = word_embeddings.shape[0]
             word_embedding_dim = word_embeddings.shape[1]
@@ -263,10 +263,15 @@ class LSTMTagger:
         self.word_bi_lstm = dy.BiRNNBuilder(num_lstm_layers, input_dim, hidden_dim, self.model, dy.LSTMBuilder)
 
         # Matrix that maps from Bi-LSTM output to num tags
-        self.lstm_to_tags_params = self.model.add_parameters((tagset_size, hidden_dim))
-        self.lstm_to_tags_bias = self.model.add_parameters(tagset_size)
-        self.mlp_out = self.model.add_parameters((tagset_size, tagset_size))
-        self.mlp_out_bias = self.model.add_parameters(tagset_size)
+        self.lstm_to_tags_params = {}
+        self.lstm_to_tags_bias = {}
+        self.mlp_out = {}
+        self.mlp_out_bias = {}
+        for att, set_size in tagset_sizes.items():
+            self.lstm_to_tags_params[att] = self.model.add_parameters((set_size, hidden_dim))
+            self.lstm_to_tags_bias[att] = self.model.add_parameters(set_size)
+            self.mlp_out[att] = self.model.add_parameters((set_size, set_size))
+            self.mlp_out_bias[att] = self.model.add_parameters(set_size)
 
 
     def word_rep(self, w):
@@ -288,37 +293,48 @@ class LSTMTagger:
 
         lstm_out = self.word_bi_lstm.transduce(embeddings)
 
-        H = dy.parameter(self.lstm_to_tags_params)
-        Hb = dy.parameter(self.lstm_to_tags_bias)
-        O = dy.parameter(self.mlp_out)
-        Ob = dy.parameter(self.mlp_out_bias)
-        scores = []
-        for rep in lstm_out:
-            score_t = O * dy.tanh(H * rep + Hb) + Ob
-            scores.append(score_t)
+        H = {}
+        Hb = {}
+        O = {}
+        Ob = {}
+        scores = {}
+        for att in self.attributes:        
+            H[att] = dy.parameter(self.lstm_to_tags_params[att])
+            Hb[att] = dy.parameter(self.lstm_to_tags_bias[att])
+            O[att] = dy.parameter(self.mlp_out[att])
+            Ob[att] = dy.parameter(self.mlp_out_bias[att])
+            scores[att] = []
+            for rep in lstm_out:
+                score_t = O[att] * dy.tanh(H[att] * rep + Hb[att]) + Ob[att]
+                scores[att].append(score_t)
 
         return scores
 
 
     def loss(self, sentence, tags_set):
-        tags = tags_set["POS"]
-        observations = self.build_tagging_graph(sentence)
-        errors = []
-        for obs, tag in zip(observations, tags):
-            err_t = dy.pickneglogsoftmax(obs, tag)
-            errors.append(err_t)
-        return dy.esum(errors)
+        observations_set = self.build_tagging_graph(sentence)
+        errors = {}
+        for att, tags in tags_set.items():
+            err = []
+            for obs, tag in zip(observations_set[att], tags):
+                err_t = dy.pickneglogsoftmax(obs, tag)
+                err.append(err_t)
+            errors[att] = dy.esum(err)
+        return errors
 
 
     def tag_sentence(self, sentence):
-        observations = self.build_tagging_graph(sentence)
-        observations = [ dy.softmax(obs) for obs in observations ]
-        probs = [ obs.npvalue() for obs in observations ]
-        tag_seq = []
-        for prob in probs:
-            tag_t = np.argmax(prob)
-            tag_seq.append(tag_t)
-        return tag_seq
+        observations_set = self.build_tagging_graph(sentence)
+        tag_seqs = {}
+        for att, observations in observations_set.items():
+            observations = [ dy.softmax(obs) for obs in observations ]
+            probs = [ obs.npvalue() for obs in observations ]
+            tag_seq = []
+            for prob in probs:
+                tag_t = np.argmax(prob)
+                tag_seq.append(tag_t)
+            tag_seqs[att] = tag_seq
+        return tag_seqs
 
     
     def set_dropout(self, p):
@@ -345,7 +361,7 @@ parser.add_argument("--dropout", default=-1, dest="dropout", type=float, help="A
 parser.add_argument("--viterbi", dest="viterbi", action="store_true", help="Use viterbi training instead of CRF")
 parser.add_argument("--loss-aggregation", default="average", dest="loss_aggregation", help="Aggregation method for loss function in multi-attribute tagging. Supported values - average (default), min, max")
 parser.add_argument("--no-sequence-model", dest="no_sequence_model", action="store_true", help="Use regular LSTM tagger with no viterbi")
-parser.add_argument("--use-char-rnn", dest="use_char_rnn", action="store_true", help="Use character RNN")
+parser.add_argument("--use-char-rnn", dest="use_char_rnn", action="store_true", help="Use character RNN (only in LSTMTagger)")
 parser.add_argument("--log-dir", default="log", dest="log_dir", help="Directory where to write logs / serialized models")
 parser.add_argument("--dev-output", default="dev-out", dest="dev_output", help="File with output examples")
 parser.add_argument("--pos-separate-col", default=True, dest="pos_separate_col", help="Output examples have POS in separate column")
@@ -365,6 +381,12 @@ train_dev_cost = utils.CSVLogger(options.log_dir + "/train_dev.log", ["Train.cos
 # ===-----------------------------------------------------------------------===
 # Log some stuff about this run
 # ===-----------------------------------------------------------------------===
+if options.viterbi:
+    objective = "Viterbi"
+elif options.no_sequence_model:
+    objective = "No Sequence Model"
+else:
+    objective = "CRF"
 logging.info(
 """
 Dataset: {}
@@ -377,7 +399,7 @@ Objective: {}
 Multi-attribute loss aggregation: {}
 
 """.format(options.dataset, options.word_embeddings, options.num_epochs, options.lstm_layers, options.hidden_dim,
-           options.learning_rate, options.dropout, "Viterbi" if options.viterbi else "CRF", options.loss_aggregation))
+           options.learning_rate, options.dropout, objective, options.loss_aggregation))
 
 if options.debug:
     print "DEBUG MODE"
@@ -410,9 +432,9 @@ if options.word_embeddings is not None:
 else:
     word_embeddings = None
 
-
+tag_set_sizes = { att: len(t2i) for att, t2i in t2is.items() }
 if options.no_sequence_model:
-    model = LSTMTagger(tagset_size=len(t2is["POS"]),
+    model = LSTMTagger(tagset_sizes=tag_set_sizes,
                        num_lstm_layers=options.lstm_layers,
                        hidden_dim=options.hidden_dim,
                        word_embeddings=word_embeddings,
@@ -434,7 +456,7 @@ else:
     morpheme_projection = None
     morpheme_decomps = None
     #morpheme_decomps = dataset["morpheme_segmentations"]
-    model = BiLSTM_CRF({ att: len(t2i) for att, t2i in t2is.items() },
+    model = BiLSTM_CRF(tag_set_sizes,
                        options.lstm_layers,
                        options.hidden_dim,
                        word_embeddings,
@@ -498,8 +520,13 @@ for epoch in xrange(int(options.num_epochs)):
                 loss = min(losses)
                 loss_expr = min(loss_exprs.values())
         elif options.no_sequence_model:
-            # no support for multi-attr labeling in LSTMTagger yet (existing TODO)
-            loss_expr = model.loss(instance.sentence, instance.tags)
+            gold_tags = instance.tags
+            for att in model.attributes:
+                if att not in instance.tags:
+                    gold_tags[att] = [t2is[att]["<NONE>"]] * len(instance.sentence)
+            loss_exprs = model.loss(instance.sentence, gold_tags)
+            if options.loss_aggregation == "average":
+                loss_expr = dy.average(loss_exprs.values())            
             loss = loss_expr.scalar_value()
         else:
             loss_exprs = model.neg_log_loss(instance.sentence, instance.tags)
@@ -543,10 +570,14 @@ for epoch in xrange(int(options.num_epochs)):
     for instance in bar(dev_instances):
         if len(instance.sentence) == 0: continue
         if options.no_sequence_model:
-            # no support for multi-attr labeling in LSTMTagger yet (existing TODO)
-            loss = model.loss(instance.sentence, instance.tags)
-            dev_loss += (loss.scalar_value() / len(instance.sentence))
-            out_tags = model.tag_sentence(instance.sentence)
+            gold_tags = instance.tags
+            for att in model.attributes:
+                if att not in instance.tags:
+                    gold_tags[att] = [t2is[att]["<NONE>"]] * len(instance.sentence)
+            losses = model.loss(instance.sentence, gold_tags)
+            if options.loss_aggregation == "average":
+                total_loss = sum([l.scalar_value() for l in losses.values()]) / len(losses)
+            out_tags_set = model.tag_sentence(instance.sentence)
         else:
             gold_tags = instance.tags
             for att in model.attributes:
@@ -560,39 +591,39 @@ for epoch in xrange(int(options.num_epochs)):
             elif options.loss_aggregation == "min":
                 total_loss = min([l.value() for l in losses.values()])
             _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
-            dl = 0.0
-            gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
-            obs_strings = utils.morphotag_strings(i2ts, out_tags_set, options.pos_separate_col)
-            dev_writer.write("\n"
-                             + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
-                                                                         gold_strings, obs_strings)])
-                             + "\n")
-            for g, o in zip(gold_strings, obs_strings):
-                f1_eval.add_instance(utils.split_tagstring(g), utils.split_tagstring(o))
-            for att, tags in gold_tags.items():
-                out_tags = out_tags_set[att]
-                correct_sent = True
-    
-                for word, gold, out in zip(instance.sentence, tags, out_tags):
-                    if gold == out:
-                        dev_correct[att] += 1
-                    else:
-                        # Got the wrong tag
-                        total_wrong[att] += 1
-                        correct_sent = False
-                        if i2w[word] not in training_vocab:
-                            total_wrong_oov[att] += 1
-                    
+            
+        gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
+        obs_strings = utils.morphotag_strings(i2ts, out_tags_set, options.pos_separate_col)
+        dev_writer.write("\n"
+                         + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
+                                                                     gold_strings, obs_strings)])
+                         + "\n")
+        for g, o in zip(gold_strings, obs_strings):
+            f1_eval.add_instance(utils.split_tagstring(g), utils.split_tagstring(o))
+        for att, tags in gold_tags.items():
+            out_tags = out_tags_set[att]
+            correct_sent = True
+
+            for word, gold, out in zip(instance.sentence, tags, out_tags):
+                if gold == out:
+                    dev_correct[att] += 1
+                else:
+                    # Got the wrong tag
+                    total_wrong[att] += 1
+                    correct_sent = False
                     if i2w[word] not in training_vocab:
-                        dev_oov_total[att] += 1
-                # if not correct_sent:
-                #     sent, tags = utils.convert_instance(instance, i2w, i2t)
-                #     for i in range(len(sent)):
-                #         logging.info( sent[i] + "\t" + tags[i] + "\t" + i2t[viterbi_tags[i]] )
-                #     logging.info( "\n\n\n" )
-                dev_total[att] += len(tags)
+                        total_wrong_oov[att] += 1
                 
-            dev_loss += (total_loss / len(instance.sentence))
+                if i2w[word] not in training_vocab:
+                    dev_oov_total[att] += 1
+            # if not correct_sent:
+            #     sent, tags = utils.convert_instance(instance, i2w, i2t)
+            #     for i in range(len(sent)):
+            #         logging.info( sent[i] + "\t" + tags[i] + "\t" + i2t[viterbi_tags[i]] )
+            #     logging.info( "\n\n\n" )
+            dev_total[att] += len(tags)
+            
+        dev_loss += (total_loss / len(instance.sentence))
 
     dev_writer.close()
     if options.viterbi:
