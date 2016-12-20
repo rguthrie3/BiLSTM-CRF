@@ -1,0 +1,9 @@
+Example on German (analogous in other languages):
+> cd german
+> head gml/gml.cd # 'g' is for 'german'. will be diff in other languages. 'ml' - 'morphology lemmata'
+                  # use first lines to determine which columns are lemma (2) and which segments (will differ)
+> awk -f gml/awk/stripstr.awk gml/gml.cd 2 | head     # make sure you counted right
+> awk -f gml/awk/stripstr.awk gml/dml.cd 9 | head     # make sure you counted right
+> awk -f gml/awk/stripstr.awk gml/gml.cd 2 > lems.txt # will have empty lines
+> awk -f gml/awk/stripstr.awk gml/gml.cd 9 > segs.txt # will have "+"-s for segment markers + empty lines
+> python ../join.py lems.txt segs.txt                 # will output a clean joined file in joined.txt
