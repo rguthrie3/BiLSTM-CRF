@@ -19,6 +19,7 @@ import utils
 Instance = collections.namedtuple("Instance", ["sentence", "tags"])
 
 
+# TODO init from file
 class BiLSTM_CRF:
 
     def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, morpheme_embeddings, morpheme_projection, morpheme_decomps, train_vocab_ctr):
@@ -233,6 +234,7 @@ class BiLSTM_CRF:
         return self.model
 
 
+# TODO init from file
 class LSTMTagger:
 
     def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, train_vocab_ctr, use_char_rnn, charset_size, vocab_size=None, word_embedding_dim=None):
@@ -344,6 +346,10 @@ class LSTMTagger:
     def disable_dropout(self):
         self.word_bi_lstm.disable_dropout()
 
+    @property
+    def model(self):
+        return self.model
+
 
 # ===-----------------------------------------------------------------------===
 # Argument parsing
@@ -363,7 +369,6 @@ parser.add_argument("--loss-aggregation", default="average", dest="loss_aggregat
 parser.add_argument("--no-sequence-model", dest="no_sequence_model", action="store_true", help="Use regular LSTM tagger with no viterbi")
 parser.add_argument("--use-char-rnn", dest="use_char_rnn", action="store_true", help="Use character RNN (only in LSTMTagger)")
 parser.add_argument("--log-dir", default="log", dest="log_dir", help="Directory where to write logs / serialized models")
-parser.add_argument("--dev-output", default="dev-out", dest="dev_output", help="File with output examples")
 parser.add_argument("--pos-separate-col", default=True, dest="pos_separate_col", help="Output examples have POS in separate column")
 parser.add_argument("--debug", dest="debug", action="store_true", help="Debug mode")
 options = parser.parse_args()
@@ -565,67 +570,65 @@ for epoch in xrange(int(options.num_epochs)):
     total_wrong = Counter()
     total_wrong_oov = Counter()
     f1_eval = Evaluator(m = 'att')
-    dev_ext = options.dev_output.rfind(".")
-    dev_writer = open(options.dev_output[:dev_ext] + "_epoch-{:02d}".format(epoch + 1) + options.dev_output[dev_ext:], 'w')
-    for instance in bar(dev_instances):
-        if len(instance.sentence) == 0: continue
-        if options.no_sequence_model:
-            gold_tags = instance.tags
-            for att in model.attributes:
-                if att not in instance.tags:
-                    gold_tags[att] = [t2is[att]["<NONE>"]] * len(instance.sentence)
-            losses = model.loss(instance.sentence, gold_tags)
-            if options.loss_aggregation == "average":
-                total_loss = sum([l.scalar_value() for l in losses.values()]) / len(losses)
-            out_tags_set = model.tag_sentence(instance.sentence)
-        else:
-            gold_tags = instance.tags
-            for att in model.attributes:
-                if att not in instance.tags:
-                    gold_tags[att] = [t2is[att]["<NONE>"]] * len(instance.sentence)
-            losses = model.neg_log_loss(instance.sentence, gold_tags)
-            if options.loss_aggregation == "average":
-                total_loss = sum([l.value() for l in losses.values()]) / len(losses)
-            elif options.loss_aggregation == "max":
-                total_loss = max([l.value() for l in losses.values()])
-            elif options.loss_aggregation == "min":
-                total_loss = min([l.value() for l in losses.values()])
-            _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
-            
-        gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
-        obs_strings = utils.morphotag_strings(i2ts, out_tags_set, options.pos_separate_col)
-        dev_writer.write("\n"
-                         + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
-                                                                     gold_strings, obs_strings)])
-                         + "\n")
-        for g, o in zip(gold_strings, obs_strings):
-            f1_eval.add_instance(utils.split_tagstring(g), utils.split_tagstring(o))
-        for att, tags in gold_tags.items():
-            out_tags = out_tags_set[att]
-            correct_sent = True
-
-            for word, gold, out in zip(instance.sentence, tags, out_tags):
-                if gold == out:
-                    dev_correct[att] += 1
-                else:
-                    # Got the wrong tag
-                    total_wrong[att] += 1
-                    correct_sent = False
-                    if i2w[word] not in training_vocab:
-                        total_wrong_oov[att] += 1
+    with open("{}/devout_epoch-{:02d}.txt".format(options.log_dir, epoch + 1), 'w') as dev_writer:
+        for instance in bar(dev_instances):
+            if len(instance.sentence) == 0: continue
+            if options.no_sequence_model:
+                gold_tags = instance.tags
+                for att in model.attributes:
+                    if att not in instance.tags:
+                        gold_tags[att] = [t2is[att]["<NONE>"]] * len(instance.sentence)
+                losses = model.loss(instance.sentence, gold_tags)
+                if options.loss_aggregation == "average":
+                    total_loss = sum([l.scalar_value() for l in losses.values()]) / len(losses)
+                out_tags_set = model.tag_sentence(instance.sentence)
+            else:
+                gold_tags = instance.tags
+                for att in model.attributes:
+                    if att not in instance.tags:
+                        gold_tags[att] = [t2is[att]["<NONE>"]] * len(instance.sentence)
+                losses = model.neg_log_loss(instance.sentence, gold_tags)
+                if options.loss_aggregation == "average":
+                    total_loss = sum([l.value() for l in losses.values()]) / len(losses)
+                elif options.loss_aggregation == "max":
+                    total_loss = max([l.value() for l in losses.values()])
+                elif options.loss_aggregation == "min":
+                    total_loss = min([l.value() for l in losses.values()])
+                _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
                 
-                if i2w[word] not in training_vocab:
-                    dev_oov_total[att] += 1
-            # if not correct_sent:
-            #     sent, tags = utils.convert_instance(instance, i2w, i2t)
-            #     for i in range(len(sent)):
-            #         logging.info( sent[i] + "\t" + tags[i] + "\t" + i2t[viterbi_tags[i]] )
-            #     logging.info( "\n\n\n" )
-            dev_total[att] += len(tags)
-            
-        dev_loss += (total_loss / len(instance.sentence))
+            gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
+            obs_strings = utils.morphotag_strings(i2ts, out_tags_set, options.pos_separate_col)
+            dev_writer.write("\n"
+                             + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
+                                                                         gold_strings, obs_strings)])
+                             + "\n")
+            for g, o in zip(gold_strings, obs_strings):
+                f1_eval.add_instance(utils.split_tagstring(g), utils.split_tagstring(o))
+            for att, tags in gold_tags.items():
+                out_tags = out_tags_set[att]
+                correct_sent = True
 
-    dev_writer.close()
+                for word, gold, out in zip(instance.sentence, tags, out_tags):
+                    if gold == out:
+                        dev_correct[att] += 1
+                    else:
+                        # Got the wrong tag
+                        total_wrong[att] += 1
+                        correct_sent = False
+                        if i2w[word] not in training_vocab:
+                            total_wrong_oov[att] += 1
+                    
+                    if i2w[word] not in training_vocab:
+                        dev_oov_total[att] += 1
+                # if not correct_sent:
+                #     sent, tags = utils.convert_instance(instance, i2w, i2t)
+                #     for i in range(len(sent)):
+                #         logging.info( sent[i] + "\t" + tags[i] + "\t" + i2t[viterbi_tags[i]] )
+                #     logging.info( "\n\n\n" )
+                dev_total[att] += len(tags)
+                
+            dev_loss += (total_loss / len(instance.sentence))
+
     if options.viterbi:
         logging.info("POS Train Accuracy: {}".format(train_correct["POS"] / train_total["POS"]))
     logging.info("POS Dev Accuracy: {}".format(dev_correct["POS"] / dev_total["POS"]))
@@ -642,3 +645,15 @@ for epoch in xrange(int(options.num_epochs)):
     logging.info("Train Loss: {}".format(train_loss))
     logging.info("Dev Loss: {}".format(dev_loss))
     train_dev_cost.add_column([train_loss, dev_loss])
+    
+    # Serialize model
+    new_model_file_name = "{}/model_epoch-{:02d}.bin".format(options.log_dir, epoch + 1)
+    logging.info("Saving model to {}".format(new_model_file_name))
+    model.model.save(new_model_file_name)
+    if epoch > 1 and epoch % 10 != 0: # leave models from epochs 1,10,20, etc.
+        logging.info("Removing files from previous epoch.")
+        old_model_file_name = "{}/model_epoch-{:02d}.bin".format(options.log_dir, epoch)
+        os.remove(old_model_file_name)
+        old_devout_file_name = "{}/devout_epoch-{:02d}.txt".format(options.log_dir, epoch)
+        os.remove(old_devout_file_name)
+    
