@@ -545,7 +545,6 @@ for epoch in xrange(int(options.num_epochs)):
                     train_correct[att] += len(tags)
                 train_total[att] += len(tags)
                 losses.append(l)
-            loss = sum(losses) / len(losses) # TODO maybe change to sum
             loss_expr = dy.average(loss_exprs.values()) # TODO maybe change to sum
         elif options.no_sequence_model:
             gold_tags = instance.tags
@@ -554,11 +553,10 @@ for epoch in xrange(int(options.num_epochs)):
                     gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
             loss_exprs = model.loss(instance.sentence, gold_tags)
             loss_expr = dy.average(loss_exprs.values()) # TODO maybe change to sum
-            loss = loss_expr.scalar_value()
         else:
             loss_exprs = model.neg_log_loss(instance.sentence, instance.tags)
             loss_expr = dy.average(loss_exprs.values()) # TODO maybe change to sum
-            loss = loss_expr.scalar_value()
+        loss = loss_expr.scalar_value()
 
         # Bail if loss is NaN
         if math.isnan(loss):
