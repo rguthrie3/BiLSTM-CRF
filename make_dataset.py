@@ -26,6 +26,13 @@ from utils import split_tagstring
 
 Instance = collections.namedtuple("Instance", ["sentence", "tags"])
 
+UNK_TAG = "<UNK>"
+NONE_TAG = "<NONE>"
+START_TAG = "<START>"
+END_TAG = "<STOP>"
+PADDING_CHAR = "<*>"
+POS_KEY = "POS"
+
 def read_morpheme_segmentations(filename, w2i, m2i):
     segmentations = {}
     with codecs.open(filename, "r", "utf-8") as f:
@@ -49,10 +56,10 @@ def read_file(filename, w2i, t2is, c2i):
     """
     
     # populate mandatory t2i tables
-    if "POS" not in t2is:
-        t2is["POS"] = {}
+    if POS_TAG not in t2is:
+        t2is[POS_TAG] = {}
     if options.flat_morphotags and "MORPH" not in t2is:
-        t2is["MORPH"] = {"<NONE>":0}
+        t2is["MORPH"] = {NONE_TAG:0}
     
     instances = []
     vocab_counter = collections.Counter()
@@ -83,7 +90,7 @@ def read_file(filename, w2i, t2is, c2i):
                 vocab_counter[word] += 1
                 if word not in w2i:
                     w2i[word] = len(w2i)
-                pt2i = t2is["POS"]
+                pt2i = t2is[POS_TAG]
                 if postag not in pt2i:
                     pt2i[postag] = len(pt2i)
                 for c in word:
@@ -97,12 +104,12 @@ def read_file(filename, w2i, t2is, c2i):
                 else:
                     for key, val in morphotags.items():
                         if key not in t2is:
-                            t2is[key] = {"<NONE>":0}
+                            t2is[key] = {NONE_TAG:0}
                         mt2i = t2is[key]
                         if val not in mt2i:
                             mt2i[val] = len(mt2i)
                 sentence.append(w2i[word])
-                tags["POS"].append(t2is["POS"][postag])
+                tags[POS_TAG].append(t2is[POS_TAG][postag])
                 if options.flat_morphotags:
                     tags["MORPH"].append([t2is["MORPH"][t] for t in morphotags.items()])
                 else:
@@ -169,11 +176,11 @@ if options.morpheme_segmentations is not None:
     output["m2i"] = m2i
 
 # Add special tokens / tags / chars to dicts
-w2i["<UNK>"] = len(w2i)
+w2i[UNK_TAG] = len(w2i)
 for t2i in t2is.values():
-    t2i["<START>"] = len(t2i)
-    t2i["<STOP>"] = len(t2i)
-c2i["<*>"] = len(c2i) # padding char
+    t2i[START_TAG] = len(t2i)
+    t2i[END_TAG] = len(t2i)
+c2i[PADDING_CHAR] = len(c2i)
 
 output["w2i"] = w2i
 output["t2is"] = t2is

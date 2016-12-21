@@ -5,6 +5,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
 
+NONE_TAG = "<NONE>"
+POS_KEY = "POS"
+
 class CSVLogger:
 
     def __init__(self, filename, columns):
@@ -112,9 +115,9 @@ def morphotag_strings(i2ts, tag_mapping, pos_separate_col=True):
         place_strs = []
         for att, seq in tag_mapping.items():
             val = i2ts[att][seq[j]]
-            if pos_separate_col and att == "POS":
+            if pos_separate_col and att == POS_KEY:
                 pos_str = val
-            elif val != "<NONE>":
+            elif val != NONE_TAG:
                 place_strs.append(att + "=" + val)
         morpho_str = "|".join(sorted(place_strs))
         if pos_separate_col:

@@ -18,6 +18,11 @@ import utils
 
 Instance = collections.namedtuple("Instance", ["sentence", "tags"])
 
+NONE_TAG = "<NONE>"
+START_TAG = "<START>"
+END_TAG = "<STOP>"
+POS_KEY = "POS"
+
 
 # TODO init from file
 class BiLSTM_CRF:
@@ -127,16 +132,16 @@ class BiLSTM_CRF:
     def score_sentence(self, observations, tags, att):
         t2i = t2is[att]
         if len(tags) == 0:
-            tags = [t2i["<NONE>"]] * len(observations)
+            tags = [t2i[NONE_TAG]] * len(observations)
         assert len(observations) == len(tags)
         trans = self.transitions[att]
         score_seq = [0]
         score = dy.scalarInput(0)
-        tags = [t2i["<START>"]] + tags
+        tags = [t2i[START_TAG]] + tags
         for i, obs in enumerate(observations):
             score = score + dy.pick(trans[tags[i+1]], tags[i]) + dy.pick(obs, tags[i+1])
             score_seq.append(score.value())
-        score = score + dy.pick(trans[t2i["<STOP>"]], tags[-1])
+        score = score + dy.pick(trans[t2i[END_TAG]], tags[-1])
         return score
 
 
@@ -180,7 +185,7 @@ class BiLSTM_CRF:
         trans = self.transitions[att]
         tagset_size = self.tagset_sizes[att]
         init_alphas = [-1e10] * tagset_size
-        init_alphas[t2i["<START>"]] = 0
+        init_alphas[t2i[START_TAG]] = 0
         for_expr = dy.inputVector(init_alphas)
         for obs in observations:
             alphas_t = []
@@ -189,7 +194,7 @@ class BiLSTM_CRF:
                 next_tag_expr = for_expr + trans[next_tag] + obs_broadcast
                 alphas_t.append(log_sum_exp(next_tag_expr, tagset_size))
             for_expr = dy.concatenate(alphas_t)
-        terminal_expr = for_expr + trans[t2i["<STOP>"]]
+        terminal_expr = for_expr + trans[t2i[END_TAG]]
         alpha = log_sum_exp(terminal_expr, tagset_size)
         return alpha
 
@@ -199,7 +204,7 @@ class BiLSTM_CRF:
         tagset_size = self.tagset_sizes[att]
         backpointers = []
         init_vvars   = [-1e10] * tagset_size
-        init_vvars[t2i["<START>"]] = 0 # <Start> has all the probability
+        init_vvars[t2i[START_TAG]] = 0 # <Start> has all the probability
         for_expr     = dy.inputVector(init_vvars)
         trans_exprs  = [self.transitions[att][idx] for idx in range(tagset_size)]
         for obs in observations:
@@ -214,7 +219,7 @@ class BiLSTM_CRF:
             for_expr = dy.concatenate(vvars_t) + obs
             backpointers.append(bptrs_t)
         # Perform final transition to terminal
-        terminal_expr = for_expr + trans_exprs[t2i["<STOP>"]]
+        terminal_expr = for_expr + trans_exprs[t2i[END_TAG]]
         terminal_arr  = terminal_expr.npvalue()
         best_tag_id   = np.argmax(terminal_arr)
         path_score    = dy.pick(terminal_expr, best_tag_id)
@@ -225,7 +230,7 @@ class BiLSTM_CRF:
             best_path.append(best_tag_id)
         start = best_path.pop() # Remove the start symbol
         best_path.reverse()
-        assert start == t2i["<START>"]
+        assert start == t2i[START_TAG]
         # Return best path and best path's score
         return best_path, path_score
 
@@ -501,7 +506,7 @@ for epoch in xrange(int(options.num_epochs)):
             gold_tags = instance.tags
             for att in model.attributes:
                 if att not in instance.tags:
-                    gold_tags[att] = [t2is[att]["<NONE>"]] * len(instance.sentence)
+                    gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
             loss_exprs, viterbi_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
             for att, tags in gold_tags.items():
                 vit_tags = viterbi_tags_set[att]
@@ -528,7 +533,7 @@ for epoch in xrange(int(options.num_epochs)):
             gold_tags = instance.tags
             for att in model.attributes:
                 if att not in instance.tags:
-                    gold_tags[att] = [t2is[att]["<NONE>"]] * len(instance.sentence)
+                    gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
             loss_exprs = model.loss(instance.sentence, gold_tags)
             if options.loss_aggregation == "average":
                 loss_expr = dy.average(loss_exprs.values())            
@@ -577,7 +582,7 @@ for epoch in xrange(int(options.num_epochs)):
                 gold_tags = instance.tags
                 for att in model.attributes:
                     if att not in instance.tags:
-                        gold_tags[att] = [t2is[att]["<NONE>"]] * len(instance.sentence)
+                        gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
                 losses = model.loss(instance.sentence, gold_tags)
                 if options.loss_aggregation == "average":
                     total_loss = sum([l.scalar_value() for l in losses.values()]) / len(losses)
@@ -586,7 +591,7 @@ for epoch in xrange(int(options.num_epochs)):
                 gold_tags = instance.tags
                 for att in model.attributes:
                     if att not in instance.tags:
-                        gold_tags[att] = [t2is[att]["<NONE>"]] * len(instance.sentence)
+                        gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
                 losses = model.neg_log_loss(instance.sentence, gold_tags)
                 if options.loss_aggregation == "average":
                     total_loss = sum([l.value() for l in losses.values()]) / len(losses)
@@ -630,13 +635,13 @@ for epoch in xrange(int(options.num_epochs)):
             dev_loss += (total_loss / len(instance.sentence))
 
     if options.viterbi:
-        logging.info("POS Train Accuracy: {}".format(train_correct["POS"] / train_total["POS"]))
-    logging.info("POS Dev Accuracy: {}".format(dev_correct["POS"] / dev_total["POS"]))
-    logging.info("POS % OOV accuracy: {}".format((dev_oov_total["POS"] - total_wrong_oov["POS"]) / dev_oov_total["POS"]))
-    if total_wrong["POS"] > 0:
-        logging.info("POS % Wrong that are OOV: {}".format(total_wrong_oov["POS"] / total_wrong["POS"]))
+        logging.info("POS Train Accuracy: {}".format(train_correct[POS_KEY] / train_total[POS_KEY]))
+    logging.info("POS Dev Accuracy: {}".format(dev_correct[POS_KEY] / dev_total[POS_KEY]))
+    logging.info("POS % OOV accuracy: {}".format((dev_oov_total[POS_KEY] - total_wrong_oov[POS_KEY]) / dev_oov_total[POS_KEY]))
+    if total_wrong[POS_KEY] > 0:
+        logging.info("POS % Wrong that are OOV: {}".format(total_wrong_oov[POS_KEY] / total_wrong[POS_KEY]))
     for attr in t2is.keys():
-        if attr != "POS":
+        if attr != POS_KEY:
             logging.info("{} F1: {}".format(attr, f1_eval.mic_f1(att = attr)))
     logging.info("Total attribute F1s: {} micro, {} macro, POS included = {}".format(f1_eval.mic_f1(), f1_eval.mac_f1(), not options.pos_separate_col))
 
