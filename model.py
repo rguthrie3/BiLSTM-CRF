@@ -27,10 +27,11 @@ POS_KEY = "POS"
 # TODO init from file
 class BiLSTM_CRF:
 
-    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, morpheme_embeddings, morpheme_projection, morpheme_decomps, train_vocab_ctr):
+    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, morpheme_embeddings, morpheme_projection, morpheme_decomps, train_vocab_ctr, margins):
         self.model = dy.Model()
         self.tagset_sizes = tagset_sizes
         self.train_vocab_ctr = train_vocab_ctr
+        self.margins = margins
 
         # Word embedding parameters
         vocab_size = word_embeddings.shape[0]
@@ -151,7 +152,7 @@ class BiLSTM_CRF:
         ret_tags = {}
         for att, observations in observations_set.items():
             tags = tags_set[att]
-            viterbi_tags, viterbi_score = self.viterbi_decoding(observations, att)
+            viterbi_tags, viterbi_score = self.viterbi_decoding(observations, tags, att)
             if viterbi_tags != tags:
                 gold_score = self.score_sentence(observations, tags, att)
                 losses[att] = viterbi_score - gold_score
@@ -199,7 +200,7 @@ class BiLSTM_CRF:
         return alpha
 
 
-    def viterbi_decoding(self, observations, att):
+    def viterbi_decoding(self, observations, gold_tags, att):
         t2i = t2is[att]
         tagset_size = self.tagset_sizes[att]
         backpointers = []
@@ -207,7 +208,7 @@ class BiLSTM_CRF:
         init_vvars[t2i[START_TAG]] = 0 # <Start> has all the probability
         for_expr     = dy.inputVector(init_vvars)
         trans_exprs  = [self.transitions[att][idx] for idx in range(tagset_size)]
-        for obs in observations:
+        for gold, obs in zip(gold_tags, observations):
             bptrs_t = []
             vvars_t = []
             for next_tag in range(tagset_size):
@@ -217,6 +218,10 @@ class BiLSTM_CRF:
                 bptrs_t.append(best_tag_id)
                 vvars_t.append(dy.pick(next_tag_expr, best_tag_id))
             for_expr = dy.concatenate(vvars_t) + obs
+            if self.margins[att] != 0:
+                adjust = [self.margins[att]] * tagset_size
+                adjust[gold] = 0
+                for_expr = for_expr + dy.inputVector(adjust)
             backpointers.append(bptrs_t)
         # Perform final transition to terminal
         terminal_expr = for_expr + trans_exprs[t2i[END_TAG]]
@@ -356,6 +361,17 @@ class LSTMTagger:
         return self.model
 
 
+def get_att_prop(instances):
+    logging.info("Calculating attribute proportions for proportional loss margin")
+    total_tokens = 0
+    att_counts = Counter()
+    for instance in instances:
+        total_tokens += len(instance.sentence)
+        for att, tags in instance.tags.items():
+            t2i = t2is[att]
+            att_counts[att] += len([t for t in tags if t != t2i.get(NONE_TAG, -1)])
+    return {att:(1.0 - (att_counts[att] / total_tokens)) for att in att_counts}
+
 # ===-----------------------------------------------------------------------===
 # Argument parsing
 # ===-----------------------------------------------------------------------===
@@ -370,7 +386,7 @@ parser.add_argument("--hidden-dim", default=128, dest="hidden_dim", type=int, he
 parser.add_argument("--learning-rate", default=0.01, dest="learning_rate", type=float, help="Initial learning rate")
 parser.add_argument("--dropout", default=-1, dest="dropout", type=float, help="Amount of dropout to apply to LSTM part of graph")
 parser.add_argument("--viterbi", dest="viterbi", action="store_true", help="Use viterbi training instead of CRF")
-parser.add_argument("--loss-aggregation", default="average", dest="loss_aggregation", help="Aggregation method for loss function in multi-attribute tagging. Supported values - average (default), min, max")
+parser.add_argument("--loss-margin", default="one", dest="loss_margin", help="Loss margin calculation method in sequence tagger (currently only supported in Viterbi). Supported values - one (default), zero, att-prop (attribute proportional)")
 parser.add_argument("--no-sequence-model", dest="no_sequence_model", action="store_true", help="Use regular LSTM tagger with no viterbi")
 parser.add_argument("--use-char-rnn", dest="use_char_rnn", action="store_true", help="Use character RNN (only in LSTMTagger)")
 parser.add_argument("--log-dir", default="log", dest="log_dir", help="Directory where to write logs / serialized models")
@@ -406,10 +422,10 @@ LSTM: {} layers, {} hidden dim
 Initial Learning Rate: {}
 Dropout: {}
 Objective: {}
-Multi-attribute loss aggregation: {}
+Viterbi margin scheme: {}
 
 """.format(options.dataset, options.word_embeddings, options.num_epochs, options.lstm_layers, options.hidden_dim,
-           options.learning_rate, options.dropout, objective, options.loss_aggregation))
+           options.learning_rate, options.dropout, objective, options.loss_margin))
 
 if options.debug:
     print "DEBUG MODE"
@@ -466,6 +482,14 @@ else:
     morpheme_projection = None
     morpheme_decomps = None
     #morpheme_decomps = dataset["morpheme_segmentations"]
+    if not options.viterbi:
+        margins = None
+    elif options.loss_margin == "one":
+        margins = {att:1.0 for att in t2is.keys()}
+    elif options.loss_margin == "zero":
+        margins = {att:0.0 for att in t2is.keys()}
+    elif options.loss_margin == "att-prop":
+        margins = get_att_prop(training_instances)
     model = BiLSTM_CRF(tag_set_sizes,
                        options.lstm_layers,
                        options.hidden_dim,
@@ -473,7 +497,8 @@ else:
                        morpheme_embeddings,
                        morpheme_projection,
                        morpheme_decomps,
-                       training_vocab)
+                       training_vocab,
+                       margins)
 
 
 trainer = dy.MomentumSGDTrainer(model.model, options.learning_rate, 0.9, 0.1)
@@ -520,34 +545,19 @@ for epoch in xrange(int(options.num_epochs)):
                     train_correct[att] += len(tags)
                 train_total[att] += len(tags)
                 losses.append(l)
-            if options.loss_aggregation == "average":
-                loss = sum(losses) / len(losses)
-                loss_expr = dy.average(loss_exprs.values())
-            elif options.loss_aggregation == "max":
-                loss = max(losses)
-                loss_expr = max(loss_exprs.values())
-            elif options.loss_aggregation == "min":
-                loss = min(losses)
-                loss_expr = min(loss_exprs.values())
+            loss = sum(losses) / len(losses) # TODO maybe change to sum
+            loss_expr = dy.average(loss_exprs.values()) # TODO maybe change to sum
         elif options.no_sequence_model:
             gold_tags = instance.tags
             for att in model.attributes:
                 if att not in instance.tags:
                     gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
             loss_exprs = model.loss(instance.sentence, gold_tags)
-            if options.loss_aggregation == "average":
-                loss_expr = dy.average(loss_exprs.values())            
+            loss_expr = dy.average(loss_exprs.values()) # TODO maybe change to sum
             loss = loss_expr.scalar_value()
         else:
             loss_exprs = model.neg_log_loss(instance.sentence, instance.tags)
-            #if options.debug:
-            #    print "Average: {}, Max: {}, Min: {} on {} expressions".format(*([x.scalar_value() for x in [dy.average(loss_exprs.values()), dy.np.max(loss_exprs.values()), dy.np.min(loss_exprs.values())]] + [len(loss_exprs)]))
-            if options.loss_aggregation == "average":
-                loss_expr = dy.average(loss_exprs.values())
-            elif options.loss_aggregation == "max":
-                loss_expr = dy.Expression(dy.np.max(loss_exprs.values()))
-            elif options.loss_aggregation == "min":
-                loss_expr = dy.Expression(dy.np.min(loss_exprs.values()))
+            loss_expr = dy.average(loss_exprs.values()) # TODO maybe change to sum
             loss = loss_expr.scalar_value()
 
         # Bail if loss is NaN
@@ -584,8 +594,7 @@ for epoch in xrange(int(options.num_epochs)):
                     if att not in instance.tags:
                         gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
                 losses = model.loss(instance.sentence, gold_tags)
-                if options.loss_aggregation == "average":
-                    total_loss = sum([l.scalar_value() for l in losses.values()]) / len(losses)
+                total_loss = sum([l.scalar_value() for l in losses.values()]) / len(losses) # TODO maybe change to sum
                 out_tags_set = model.tag_sentence(instance.sentence)
             else:
                 gold_tags = instance.tags
@@ -593,12 +602,7 @@ for epoch in xrange(int(options.num_epochs)):
                     if att not in instance.tags:
                         gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
                 losses = model.neg_log_loss(instance.sentence, gold_tags)
-                if options.loss_aggregation == "average":
-                    total_loss = sum([l.value() for l in losses.values()]) / len(losses)
-                elif options.loss_aggregation == "max":
-                    total_loss = max([l.value() for l in losses.values()])
-                elif options.loss_aggregation == "min":
-                    total_loss = min([l.value() for l in losses.values()])
+                total_loss = sum([l.value() for l in losses.values()]) / len(losses) # TODO maybe change to sum
                 _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
                 
             gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
@@ -654,7 +658,7 @@ for epoch in xrange(int(options.num_epochs)):
     # Serialize model
     new_model_file_name = "{}/model_epoch-{:02d}.bin".format(options.log_dir, epoch + 1)
     logging.info("Saving model to {}".format(new_model_file_name))
-    model.model.save(new_model_file_name)
+    model.model.save(new_model_file_name) # TODO also save non-internal model stuff like mappings
     if epoch > 1 and epoch % 10 != 0: # leave models from epochs 1,10,20, etc.
         logging.info("Removing files from previous epoch.")
         old_model_file_name = "{}/model_epoch-{:02d}.bin".format(options.log_dir, epoch)
