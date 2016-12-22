@@ -27,7 +27,7 @@ POS_KEY = "POS"
 # TODO init from file
 class BiLSTM_CRF:
 
-    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, morpheme_embeddings, morpheme_projection, morpheme_decomps, train_vocab_ctr, margins):
+    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, morpheme_embeddings, morpheme_projection, morpheme_decomps, use_char_rnn, charset_size, train_vocab_ctr, margins):
         self.model = dy.Model()
         self.tagset_sizes = tagset_sizes
         self.train_vocab_ctr = train_vocab_ctr
@@ -54,9 +54,19 @@ class BiLSTM_CRF:
         #     self.morpheme_projection.init_from_array(morpheme_projection)
         # else:
         #     self.morpheme_projection = None
+        
+        # Char LSTM Parameters
+        self.use_char_rnn = use_char_rnn
+        if use_char_rnn:
+            self.char_lookup = self.model.add_lookup_parameters((charset_size, 20))
+            self.char_bi_lstm = dy.BiRNNBuilder(1, 20, 128, self.model, dy.LSTMBuilder)
 
-        # LSTM parameters
-        self.bi_lstm = dy.BiRNNBuilder(num_lstm_layers, word_embedding_dim, hidden_dim, self.model, dy.LSTMBuilder)
+        # Word LSTM parameters
+        if use_char_rnn:
+            input_dim = word_embedding_dim + 128
+        else:
+            input_dim = word_embedding_dim
+        self.bi_lstm = dy.BiRNNBuilder(num_lstm_layers, input_dim, hidden_dim, self.model, dy.LSTMBuilder)
         
         self.attributes = tagset_sizes.keys()
         self.lstm_to_tags_params = {}
@@ -500,6 +510,8 @@ else:
                        morpheme_embeddings,
                        morpheme_projection,
                        morpheme_decomps,
+                       options.use_char_rnn,
+                       len(c2i),
                        training_vocab,
                        margins)
 
