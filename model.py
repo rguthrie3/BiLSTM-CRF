@@ -34,11 +34,14 @@ class BiLSTM_CRF:
         self.margins = margins
 
         # Word embedding parameters
-        vocab_size = word_embeddings.shape[0]
-        word_embedding_dim = word_embeddings.shape[1]
-        self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
-        self.words_lookup.init_from_array(word_embeddings)
-
+        if word_embeddings is not None: # Use pretrained embeddings
+            vocab_size = word_embeddings.shape[0]
+            word_embedding_dim = word_embeddings.shape[1]
+            self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
+            self.words_lookup.init_from_array(word_embeddings)
+        else:
+            self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
+        
         # Morpheme embedding parameters
         # morpheme_vocab_size = morpheme_embeddings.shape[0]
         # morpheme_embedding_dim = morpheme_embeddings.shape[1]
