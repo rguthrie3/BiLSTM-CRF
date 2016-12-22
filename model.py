@@ -545,17 +545,17 @@ for epoch in xrange(int(options.num_epochs)):
                     train_correct[att] += len(tags)
                 train_total[att] += len(tags)
                 losses.append(l)
-            loss_expr = dy.average(loss_exprs.values()) # TODO maybe change to sum
+            loss_expr = dy.esum(loss_exprs.values()) # TODO or average
         elif options.no_sequence_model:
             gold_tags = instance.tags
             for att in model.attributes:
                 if att not in instance.tags:
                     gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
             loss_exprs = model.loss(instance.sentence, gold_tags)
-            loss_expr = dy.average(loss_exprs.values()) # TODO maybe change to sum
+            loss_expr = dy.esum(loss_exprs.values()) # TODO or average
         else:
             loss_exprs = model.neg_log_loss(instance.sentence, instance.tags)
-            loss_expr = dy.average(loss_exprs.values()) # TODO maybe change to sum
+            loss_expr = dy.esum(loss_exprs.values()) # TODO or average
         loss = loss_expr.scalar_value()
 
         # Bail if loss is NaN
@@ -583,8 +583,12 @@ for epoch in xrange(int(options.num_epochs)):
     total_wrong = Counter()
     total_wrong_oov = Counter()
     f1_eval = Evaluator(m = 'att')
+    if options.debug:
+        d_instances = dev_instances[0:int(len(dev_instances)/10)]
+    else:
+        d_instances = dev_instances
     with open("{}/devout_epoch-{:02d}.txt".format(options.log_dir, epoch + 1), 'w') as dev_writer:
-        for instance in bar(dev_instances):
+        for instance in bar(d_instances):
             if len(instance.sentence) == 0: continue
             if options.no_sequence_model:
                 gold_tags = instance.tags
@@ -592,7 +596,7 @@ for epoch in xrange(int(options.num_epochs)):
                     if att not in instance.tags:
                         gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
                 losses = model.loss(instance.sentence, gold_tags)
-                total_loss = sum([l.scalar_value() for l in losses.values()]) / len(losses) # TODO maybe change to sum
+                total_loss = sum([l.scalar_value() for l in losses.values()]) # TODO or average
                 out_tags_set = model.tag_sentence(instance.sentence)
             else:
                 gold_tags = instance.tags
@@ -600,7 +604,7 @@ for epoch in xrange(int(options.num_epochs)):
                     if att not in instance.tags:
                         gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
                 losses = model.neg_log_loss(instance.sentence, gold_tags)
-                total_loss = sum([l.value() for l in losses.values()]) / len(losses) # TODO maybe change to sum
+                total_loss = sum([l.value() for l in losses.values()]) # TODO or average
                 _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
                 
             gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
@@ -647,8 +651,8 @@ for epoch in xrange(int(options.num_epochs)):
             logging.info("{} F1: {}".format(attr, f1_eval.mic_f1(att = attr)))
     logging.info("Total attribute F1s: {} micro, {} macro, POS included = {}".format(f1_eval.mic_f1(), f1_eval.mac_f1(), not options.pos_separate_col))
 
-    train_loss = train_loss / len(training_instances)
-    dev_loss = dev_loss / len(dev_instances)
+    train_loss = train_loss / len(train_instances)
+    dev_loss = dev_loss / len(d_instances)
     logging.info("Train Loss: {}".format(train_loss))
     logging.info("Dev Loss: {}".format(dev_loss))
     train_dev_cost.add_column([train_loss, dev_loss])
