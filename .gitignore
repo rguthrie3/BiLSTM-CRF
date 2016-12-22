@@ -1,5 +1,6 @@
 *.pyc
 .*project
+*.sh
 results/
 log*/
 vocab.txt
