@@ -32,6 +32,7 @@ START_TAG = "<START>"
 END_TAG = "<STOP>"
 PADDING_CHAR = "<*>"
 POS_KEY = "POS"
+MORPH_KEY = "MORPH"
 
 def read_morpheme_segmentations(filename, w2i, m2i):
     segmentations = {}
@@ -56,10 +57,10 @@ def read_file(filename, w2i, t2is, c2i):
     """
     
     # populate mandatory t2i tables
-    if POS_TAG not in t2is:
-        t2is[POS_TAG] = {}
-    if options.flat_morphotags and "MORPH" not in t2is:
-        t2is["MORPH"] = {NONE_TAG:0}
+    if POS_KEY not in t2is:
+        t2is[POS_KEY] = {}
+    if options.flat_morphotags and MORPH_KEY not in t2is:
+        t2is[MORPH_KEY] = {NONE_TAG:0}
     
     instances = []
     vocab_counter = collections.Counter()
@@ -90,7 +91,7 @@ def read_file(filename, w2i, t2is, c2i):
                 vocab_counter[word] += 1
                 if word not in w2i:
                     w2i[word] = len(w2i)
-                pt2i = t2is[POS_TAG]
+                pt2i = t2is[POS_KEY]
                 if postag not in pt2i:
                     pt2i[postag] = len(pt2i)
                 for c in word:
@@ -98,7 +99,7 @@ def read_file(filename, w2i, t2is, c2i):
                         c2i[c] = len(c2i)
                 if options.flat_morphotags:
                     for mtag in morphotags:
-                        mt2i = t2is["MORPH"]
+                        mt2i = t2is[MORPH_KEY]
                         if mtag not in mt2i:
                             mt2i[mtag] = len(mt2i)
                 else:
@@ -109,9 +110,9 @@ def read_file(filename, w2i, t2is, c2i):
                         if val not in mt2i:
                             mt2i[val] = len(mt2i)
                 sentence.append(w2i[word])
-                tags[POS_TAG].append(t2is[POS_TAG][postag])
+                tags[POS_KEY].append(t2is[POS_KEY][postag])
                 if options.flat_morphotags:
-                    tags["MORPH"].append([t2is["MORPH"][t] for t in morphotags.items()])
+                    tags[MORPH_KEY].append([t2is[MORPH_KEY][t] for t in morphotags.items()])
                 else:
                     for k,v in morphotags.items():
                         mtags = tags[k]
@@ -155,7 +156,7 @@ parser.add_argument("--dev-data", required=True, dest="dev_data", help="Developm
 parser.add_argument("--test-data", required=True, dest="test_data", help="Test data .txt file")
 parser.add_argument("--ud-tags", dest="ud_tags", action="store_true", help="Extract UD tags instead of original tags")
 parser.add_argument("--morphotags", dest="morphotags", action="store_true", help="Add morphosyntactic tags to dataset")
-parser.add_argument("--flat-morphotags", dest="flat_morphotags", default=False, help="Morphosyntactic tags are flattened to single features")
+parser.add_argument("--flat-morphotags", dest="flat_morphotags", action="store_true", help="Morphosyntactic tags are flattened to single features")
 parser.add_argument("--morpheme-segmentations", dest="morpheme_segmentations", help="Morpheme segmentations file")
 parser.add_argument("-o", required=True, dest="output", help="Output filename (.pkl)")
 parser.add_argument("--vocab-file", dest="vocab_file", default="vocab.txt", help="Text file containing all of the words in \
