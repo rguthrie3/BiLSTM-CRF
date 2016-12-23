@@ -279,7 +279,7 @@ class BiLSTM_CRF:
             attdict.write("\t".join(sorted(self.attributes)))
         
         # TODO save morpheme stuff in non-model location (like self.attributes)
-		# TODO also for tagset_sizes, train_vocab_ctr, margins?
+        # TODO also for tagset_sizes, train_vocab_ctr, margins?
     
     @property
     def model(self):
@@ -396,6 +396,25 @@ class LSTMTagger:
 
     def disable_dropout(self):
         self.word_bi_lstm.disable_dropout()
+
+    def save(self, file_name):
+        members_to_save = []
+        members_to_save.append(self.words_lookup)
+        if (self.use_char_rnn):
+            members_to_save.append(self.char_lookup)
+            members_to_save.append(self.char_bi_lstm)
+        members_to_save.append(self.word_bi_lstm)
+        members_to_save.extend(utils.sortvals(self.lstm_to_tags_params))
+        members_to_save.extend(utils.sortvals(self.lstm_to_tags_bias))
+        members_to_save.extend(utils.sortvals(self.mlp_out))
+        members_to_save.extend(utils.sortvals(self.mlp_out_bias))
+        self.model.save(file_name, members_to_save)
+        
+        with open(file_name + "-atts", 'w') as attdict:
+            attdict.write("\t".join(sorted(self.attributes)))
+        
+        # TODO save morpheme stuff in non-model location (like self.attributes)
+        # TODO also for tagset_sizes, train_vocab_ctr, margins?
 
     @property
     def model(self):

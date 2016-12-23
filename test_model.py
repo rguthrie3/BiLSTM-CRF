@@ -211,43 +211,30 @@ class BiLSTM_CRF:
 # LOADING NOT YET IMPLEMENTED
 class LSTMTagger:
 
-    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, train_vocab_ctr, use_char_rnn, charset_size, vocab_size=None, word_embedding_dim=None):
-        self.model = dy.Model()
-        self.tagset_sizes = tagset_sizes
-        self.train_vocab_ctr = train_vocab_ctr
-        self.attributes = tagset_sizes.keys()
-        
-        if word_embeddings is not None: # Use pretrained embeddings
-            vocab_size = word_embeddings.shape[0]
-            word_embedding_dim = word_embeddings.shape[1]
-            self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
-            self.words_lookup.init_from_array(word_embeddings)
-        else:
-            self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
-
-        # Char LSTM Parameters
+    def __init__(self, rnn_model, use_char_rnn):
         self.use_char_rnn = use_char_rnn
-        if use_char_rnn:
-            self.char_lookup = self.model.add_lookup_parameters((charset_size, 20))
-            self.char_bi_lstm = dy.BiRNNBuilder(1, 20, 128, self.model, dy.LSTMBuilder)
-
-        # Word LSTM parameters
-        if use_char_rnn:
-            input_dim = word_embedding_dim + 128
-        else:
-            input_dim = word_embedding_dim
-        self.word_bi_lstm = dy.BiRNNBuilder(num_lstm_layers, input_dim, hidden_dim, self.model, dy.LSTMBuilder)
-
-        # Matrix that maps from Bi-LSTM output to num tags
-        self.lstm_to_tags_params = {}
-        self.lstm_to_tags_bias = {}
-        self.mlp_out = {}
-        self.mlp_out_bias = {}
-        for att, set_size in tagset_sizes.items():
-            self.lstm_to_tags_params[att] = self.model.add_parameters((set_size, hidden_dim))
-            self.lstm_to_tags_bias[att] = self.model.add_parameters(set_size)
-            self.mlp_out[att] = self.model.add_parameters((set_size, set_size))
-            self.mlp_out_bias[att] = self.model.add_parameters(set_size)
+        
+        self.model = dy.Model()
+        att_tuple = self.model.load(rnn_model)
+        self.attributes = open(rnn_model + "-atts", "r").read().split("\t")
+        att_ct = len(self.attributes)
+        idx = 0
+        self.words_lookup = att_tuple[idx]
+        idx += 1
+        if (self.use_char_rnn):
+            self.char_lookup = att_tuple[idx]
+            idx += 1
+            self.char_bi_lstm = att_tuple[idx]
+            idx += 1
+        self.word_bi_lstm = att_tuple[idx]
+        idx += 1
+        self.lstm_to_tags_params = get_next_att_batch(self.attributes, att_tuple, idx)
+        idx += att_ct
+        self.lstm_to_tags_bias = get_next_att_batch(self.attributes, att_tuple, idx)
+        idx += att_ct
+        self.mlp_out = get_next_att_batch(self.attributes, att_tuple, idx)
+        idx += att_ct
+        self.mlp_out_bias = get_next_att_batch(self.attributes, att_tuple, idx)
 
 
     def word_rep(self, w):
@@ -285,18 +272,6 @@ class LSTMTagger:
                 scores[att].append(score_t)
 
         return scores
-
-
-    def loss(self, sentence, tags_set):
-        observations_set = self.build_tagging_graph(sentence)
-        errors = {}
-        for att, tags in tags_set.items():
-            err = []
-            for obs, tag in zip(observations_set[att], tags):
-                err_t = dy.pickneglogsoftmax(obs, tag)
-                err.append(err_t)
-            errors[att] = dy.esum(err)
-        return errors
 
 
     def tag_sentence(self, sentence):
@@ -405,16 +380,8 @@ test_instances = dataset["test_instances"]
 # ===-----------------------------------------------------------------------===
 
 tag_set_sizes = { att: len(t2i) for att, t2i in t2is.items() }
-if options.no_sequence_model: # NOT IMPLEMENTED YET
-    model = LSTMTagger(tagset_sizes=tag_set_sizes,
-                       num_lstm_layers=options.lstm_layers,
-                       hidden_dim=options.hidden_dim,
-                       word_embeddings=word_embeddings,
-                       train_vocab_ctr=training_vocab,
-                       use_char_rnn=options.use_char_rnn,
-                       charset_size=len(c2i),
-                       vocab_size=len(w2i),
-                       word_embedding_dim=128)
+if options.no_sequence_model:
+    model = LSTMTagger(options.model_file, options.use_char_rnn)
 
 else:
     #morpheme_embeddings = utils.read_pretrained_embeddings(options.morpheme_embeddings, m2i)
