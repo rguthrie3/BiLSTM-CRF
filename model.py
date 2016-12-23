@@ -22,6 +22,7 @@ NONE_TAG = "<NONE>"
 START_TAG = "<START>"
 END_TAG = "<STOP>"
 POS_KEY = "POS"
+PADDING_CHAR = "<*>"
 
 
 # TODO init from file
@@ -40,11 +41,12 @@ class BiLSTM_CRF:
             self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
             self.words_lookup.init_from_array(word_embeddings)
         else:
-            self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
+            self.words_lookup = self.model.add_lookup_parameters((None, 128))
         
         # Morpheme embedding parameters
         # morpheme_vocab_size = morpheme_embeddings.shape[0]
         # morpheme_embedding_dim = morpheme_embeddings.shape[1]
+        self.morpheme_lookup = None
         # self.morpheme_lookup = self.model.add_lookup_parameters((morpheme_vocab_size, morpheme_embedding_dim))
         # self.morpheme_lookup.init_from_array(morpheme_embeddings)
         # self.morpheme_decomps = morpheme_decomps
@@ -98,31 +100,38 @@ class BiLSTM_CRF:
         For rare words in the training data, we will use their morphemes
         to make their representation
         """ 
-        if self.train_vocab_ctr[word] > 5:
-            return self.words_lookup[word]
+        if self.train_vocab_ctr[word] > 5 or self.morpheme_lookup is None:
+            wemb = self.words_lookup[word]
         else:
             # Use morpheme embeddings
             morpheme_decomp = self.morpheme_decomps[word]
-            rep = self.morpheme_lookup[morpheme_decomp[0]]
+            wemb = self.morpheme_lookup[morpheme_decomp[0]]
             for m in morpheme_decomp[1:]:
-                rep += self.morpheme_lookup[m]
+                wemb += self.morpheme_lookup[m]
             if self.morpheme_projection is not None:
-                rep = self.morpheme_projection * rep
-            if np.linalg.norm(rep.npvalue()) >= 50.0:
+                wemb = self.morpheme_projection * wemb
+            if np.linalg.norm(wemb.npvalue()) >= 50.0:
                 # This is meant to handle things like URLs and weird tokens like !!!!!!!!!!!!!!!!!!!!!
                 # that are splitting into a lot of morphemes, and their large representations are cause NaNs
                 # TODO handle this in a better way.  Looks like all such inputs are either URLs, email addresses, or
                 # long strings of a punctuation token when the decomposition is > 10
-                return self.words_lookup[w2i["<UNK>"]]
-            return rep
+                wemb = self.words_lookup[w2i["<UNK>"]]
+        
+        if self.use_char_rnn:
+            pad_char = c2i[PADDING_CHAR]
+            char_ids = [pad_char] + [c2i[c] for c in i2w[word]] + [pad_char] # TODO optimize
+            char_embs = [self.char_lookup[cid] for cid in char_ids]
+            char_exprs = self.char_bi_lstm.transduce(char_embs)
+            return dy.concatenate([ wemb, char_exprs[-1] ])
+        else:
+            return wemb
 
 
     def build_tagging_graph(self, sentence):
         dy.renew_cg()
 
-        #embeddings = [self.word_rep(w) for w in sentence]
-        embeddings = [self.words_lookup[w] for w in sentence]
-
+        embeddings = [self.word_rep(w) for w in sentence]
+        
         lstm_out = self.bi_lstm.transduce(embeddings)
         
         scores = {}
@@ -302,7 +311,7 @@ class LSTMTagger:
     def word_rep(self, w):
         wemb = self.words_lookup[w]
         if self.use_char_rnn:
-            pad_char = c2i["<*>"]
+            pad_char = c2i[PADDING_CHAR]
             char_ids = [pad_char] + [c2i[c] for c in i2w[w]] + [pad_char] # TODO optimize
             char_embs = [self.char_lookup[cid] for cid in char_ids]
             char_exprs = self.char_bi_lstm.transduce(char_embs)
