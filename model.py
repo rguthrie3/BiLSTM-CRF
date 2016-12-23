@@ -710,6 +710,9 @@ for epoch in xrange(int(options.num_epochs)):
         logging.info("Removing files from previous epoch.")
         old_model_file_name = "{}/model_epoch-{:02d}.bin".format(options.log_dir, epoch)
         os.remove(old_model_file_name)
+        os.remove(old_model_file_name + ".pym")
+        os.remove(old_model_file_name + ".pyk")
+        os.remove(old_model_file_name + "-atts")
         old_devout_file_name = "{}/devout_epoch-{:02d}.txt".format(options.log_dir, epoch)
         os.remove(old_devout_file_name)
 
