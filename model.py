@@ -27,7 +27,7 @@ PADDING_CHAR = "<*>"
 
 class BiLSTM_CRF:
 
-    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, morpheme_embeddings, morpheme_projection, morpheme_decomps, use_char_rnn, charset_size, train_vocab_ctr, margins):
+    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, morpheme_embeddings, morpheme_projection, morpheme_decomps, use_char_rnn, charset_size, train_vocab_ctr, margins, vocab_size=None):
         self.model = dy.Model()
         self.tagset_sizes = tagset_sizes
         self.train_vocab_ctr = train_vocab_ctr
@@ -40,7 +40,8 @@ class BiLSTM_CRF:
             self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
             self.words_lookup.init_from_array(word_embeddings)
         else:
-            self.words_lookup = self.model.add_lookup_parameters((None, None))
+            word_embedding_dim = 128
+            self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
         
         # Morpheme embedding parameters
         # morpheme_vocab_size = morpheme_embeddings.shape[0]
@@ -541,7 +542,8 @@ else:
                        options.use_char_rnn,
                        len(c2i),
                        training_vocab,
-                       margins)
+                       margins,
+                       vocab_size=len(w2i))
 
 
 trainer = dy.MomentumSGDTrainer(model.model, options.learning_rate, 0.9, 0.1)
