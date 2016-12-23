@@ -125,3 +125,6 @@ def morphotag_strings(i2ts, tag_mapping, pos_separate_col=True):
         else:
             key_value_strs.append(morpho_str)            
     return key_value_strs
+
+def sortvals(dct):
+    return [v for (k,v) in sorted(dct.items())]

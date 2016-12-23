@@ -25,67 +25,48 @@ POS_KEY = "POS"
 PADDING_CHAR = "<*>"
 
 
+def get_next_att_batch(attributes, att_tuple, idx):
+    ret = {}
+    for i, att in enumerate(attributes, idx):
+        ret[att] = att_tuple[i]
+    return ret
+    
 class BiLSTM_CRF:
 
-    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, morpheme_embeddings, morpheme_projection, morpheme_decomps, use_char_rnn, charset_size, train_vocab_ctr, margins):
-        self.model = dy.Model()
+    def __init__(self, rnn_model, use_char_rnn, tagset_sizes, train_vocab_ctr, margins):
         self.tagset_sizes = tagset_sizes
         self.train_vocab_ctr = train_vocab_ctr
         self.margins = margins
-
-        # Word embedding parameters
-        if word_embeddings is not None: # Use pretrained embeddings
-            vocab_size = word_embeddings.shape[0]
-            word_embedding_dim = word_embeddings.shape[1]
-            self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
-            self.words_lookup.init_from_array(word_embeddings)
-        else:
-            self.words_lookup = self.model.add_lookup_parameters((None, None))
-        
-        # Morpheme embedding parameters
-        # morpheme_vocab_size = morpheme_embeddings.shape[0]
-        # morpheme_embedding_dim = morpheme_embeddings.shape[1]
-        self.morpheme_lookup = None
-        # self.morpheme_lookup = self.model.add_lookup_parameters((morpheme_vocab_size, morpheme_embedding_dim))
-        # self.morpheme_lookup.init_from_array(morpheme_embeddings)
-        # self.morpheme_decomps = morpheme_decomps
-
-        # if morpheme_projection is not None:
-        #     self.morpheme_projection = self.model.add_parameters((word_embedding_dim, morpheme_embedding_dim))
-        #     self.morpheme_projection.init_from_array(morpheme_projection)
-        # else:
-        #     self.morpheme_projection = None
-        
-        # Char LSTM Parameters
         self.use_char_rnn = use_char_rnn
-        if use_char_rnn:
-            self.char_lookup = self.model.add_lookup_parameters((charset_size, 20))
-            self.char_bi_lstm = dy.BiRNNBuilder(1, 20, 128, self.model, dy.LSTMBuilder)
-
-        # Word LSTM parameters
-        if use_char_rnn:
-            input_dim = word_embedding_dim + 128
-        else:
-            input_dim = word_embedding_dim
-        self.bi_lstm = dy.BiRNNBuilder(num_lstm_layers, input_dim, hidden_dim, self.model, dy.LSTMBuilder)
         
-        self.attributes = tagset_sizes.keys()
-        self.lstm_to_tags_params = {}
-        self.lstm_to_tags_bias = {}
-        self.mlp_out = {}
-        self.mlp_out_bias = {}
-        self.transitions = {}
-        for attribute, set_size in tagset_sizes.items():
-            # Matrix that maps from Bi-LSTM output to num tags
-            self.lstm_to_tags_params[attribute] = self.model.add_parameters((set_size, hidden_dim))
-            self.lstm_to_tags_bias[attribute] = self.model.add_parameters(set_size)
-            self.mlp_out[attribute] = self.model.add_parameters((set_size, set_size))
-            self.mlp_out_bias[attribute] = self.model.add_parameters(set_size)
+        self.model = dy.Model()
+        att_tuple = self.model.load(rnn_model)
+        self.attributes = open(rnn_model + "-atts", "r").read().split("\t") # can also be extracted then sorted from tagset_sizes
+        att_ct = len(self.attributes)
+        idx = 0
+        self.words_lookup = att_tuple[idx]
+        idx += 1
+        if (self.use_char_rnn):
+            self.char_lookup = att_tuple[idx]
+            idx += 1
+            self.char_bi_lstm = att_tuple[idx]
+            idx += 1
+        self.bi_lstm = att_tuple[idx]
+        idx += 1
+        self.lstm_to_tags_params = get_next_att_batch(self.attributes, att_tuple, idx)
+        idx += att_ct
+        self.lstm_to_tags_bias = get_next_att_batch(self.attributes, att_tuple, idx)
+        idx += att_ct
+        self.mlp_out = get_next_att_batch(self.attributes, att_tuple, idx)
+        idx += att_ct
+        self.mlp_out_bias = get_next_att_batch(self.attributes, att_tuple, idx)
+        idx += att_ct
+        self.transitions = get_next_att_batch(self.attributes, att_tuple, idx)    
+
+        # TODO Morpheme embedding parameters
+        self.morpheme_lookup = None
+        
     
-            # Transition matrix for tagging layer, [i,j] is score of transitioning to i from j
-            self.transitions[attribute] = self.model.add_lookup_parameters((set_size, set_size))
-
-
     def set_dropout(self, p):
         self.bi_lstm.set_dropout(p)
 
@@ -184,43 +165,6 @@ class BiLSTM_CRF:
         return losses, ret_tags
 
 
-    def neg_log_loss(self, sentence, tags):
-        observations_set = self.build_tagging_graph(sentence)
-        scores = {}
-        for att, observations in observations_set.items():
-            gold_score = self.score_sentence(observations, tags[att], att)
-            forward_score = self.forward(observations, att)
-            scores[att] = forward_score - gold_score
-        return scores
-
-
-    def forward(self, observations, att):
-
-        def log_sum_exp(scores, tagset_size):
-            npval = scores.npvalue()
-            argmax_score = np.argmax(npval)
-            max_score_expr = dy.pick(scores, argmax_score)
-            max_score_expr_broadcast = dy.concatenate([max_score_expr] * tagset_size)
-            return max_score_expr + dy.log(dy.sum_cols(dy.transpose(dy.exp(scores - max_score_expr_broadcast))))
-
-        t2i = t2is[att]
-        trans = self.transitions[att]
-        tagset_size = self.tagset_sizes[att]
-        init_alphas = [-1e10] * tagset_size
-        init_alphas[t2i[START_TAG]] = 0
-        for_expr = dy.inputVector(init_alphas)
-        for obs in observations:
-            alphas_t = []
-            for next_tag in range(tagset_size):
-                obs_broadcast = dy.concatenate([dy.pick(obs, next_tag)] * tagset_size)
-                next_tag_expr = for_expr + trans[next_tag] + obs_broadcast
-                alphas_t.append(log_sum_exp(next_tag_expr, tagset_size))
-            for_expr = dy.concatenate(alphas_t)
-        terminal_expr = for_expr + trans[t2i[END_TAG]]
-        alpha = log_sum_exp(terminal_expr, tagset_size)
-        return alpha
-
-
     def viterbi_decoding(self, observations, gold_tags, att):
         t2i = t2is[att]
         tagset_size = self.tagset_sizes[att]
@@ -260,31 +204,11 @@ class BiLSTM_CRF:
         # Return best path and best path's score
         return best_path, path_score
 
-    def save(self, file_name):
-        members_to_save = []
-        members_to_save.append(self.words_lookup)
-        if (self.use_char_rnn):
-            members_to_save.append(self.char_lookup)
-            members_to_save.append(self.char_bi_lstm)
-        members_to_save.append(self.bi_lstm)
-        members_to_save.extend(utils.sortvals(self.lstm_to_tags_params))
-        members_to_save.extend(utils.sortvals(self.lstm_to_tags_bias))
-        members_to_save.extend(utils.sortvals(self.mlp_out))
-        members_to_save.extend(utils.sortvals(self.mlp_out_bias))
-        members_to_save.extend(utils.sortvals(self.transitions))
-        self.model.save(file_name, members_to_save)
-        
-        with open(file_name + "-atts", 'w') as attdict:
-            attdict.write("\t".join(sorted(self.attributes)))
-        
-        # TODO save morpheme stuff in non-model location (like self.attributes)
-		# TODO also for tagset_sizes, train_vocab_ctr, margins?
-    
     @property
     def model(self):
         return self.model
 
-
+# LOADING NOT YET IMPLEMENTED
 class LSTMTagger:
 
     def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, train_vocab_ctr, use_char_rnn, charset_size, vocab_size=None, word_embedding_dim=None):
@@ -417,19 +341,13 @@ def get_att_prop(instances):
 # ===-----------------------------------------------------------------------===
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset", required=True, dest="dataset", help=".pkl file to use")
-parser.add_argument("--word-embeddings", dest="word_embeddings", help="File from which to read in pretrained embeds")
-parser.add_argument("--morpheme-embeddings", dest="morpheme_embeddings", help="File from which to read in pretrained embeds")
+parser.add_argument("--model", required=True, dest="model_file", help="Model file to use (.bin)")
+parser.add_argument("--use-char-rnn", dest="use_char_rnn", action="store_true", help="Model being read has char RNN trained")
 parser.add_argument("--morpheme-projection", dest="morpheme_projection", help="Pickle file containing projection matrix if applicable")
-parser.add_argument("--num-epochs", default=20, dest="num_epochs", type=int, help="Number of full passes through training set")
-parser.add_argument("--lstm-layers", default=2, dest="lstm_layers", type=int, help="Number of LSTM layers")
-parser.add_argument("--hidden-dim", default=128, dest="hidden_dim", type=int, help="Size of LSTM hidden layers")
-parser.add_argument("--learning-rate", default=0.01, dest="learning_rate", type=float, help="Initial learning rate")
-parser.add_argument("--dropout", default=-1, dest="dropout", type=float, help="Amount of dropout to apply to LSTM part of graph")
 parser.add_argument("--viterbi", dest="viterbi", action="store_true", help="Use viterbi training instead of CRF")
 parser.add_argument("--loss-margin", default="one", dest="loss_margin", help="Loss margin calculation method in sequence tagger (currently only supported in Viterbi). Supported values - one (default), zero, att-prop (attribute proportional)")
 parser.add_argument("--no-sequence-model", dest="no_sequence_model", action="store_true", help="Use regular LSTM tagger with no viterbi")
-parser.add_argument("--use-char-rnn", dest="use_char_rnn", action="store_true", help="Use character RNN")
-parser.add_argument("--log-dir", default="log", dest="log_dir", help="Directory where to write logs / serialized models")
+parser.add_argument("--out-dir", default="out", dest="out_dir", help="Directory where to write output")
 parser.add_argument("--pos-separate-col", default=True, dest="pos_separate_col", help="Output examples have POS in separate column")
 parser.add_argument("--debug", dest="debug", action="store_true", help="Debug mode")
 options = parser.parse_args()
@@ -438,10 +356,9 @@ options = parser.parse_args()
 # ===-----------------------------------------------------------------------===
 # Set up logging
 # ===-----------------------------------------------------------------------===
-if not os.path.exists(options.log_dir):
-    os.mkdir(options.log_dir)
-logging.basicConfig(filename=options.log_dir + "/log.txt", filemode="w", format="%(message)s", level=logging.INFO)
-train_dev_cost = utils.CSVLogger(options.log_dir + "/train_dev.log", ["Train.cost", "Dev.cost"])
+if not os.path.exists(options.out_dir):
+    os.mkdir(options.out_dir)
+logging.basicConfig(filename=options.out_dir + "/out.txt", filemode="w", format="%(message)s", level=logging.INFO)
 
 
 # ===-----------------------------------------------------------------------===
@@ -456,16 +373,11 @@ else:
 logging.info(
 """
 Dataset: {}
-Pretrained Embeddings: {}
-Num Epochs: {}
-LSTM: {} layers, {} hidden dim
-Initial Learning Rate: {}
-Dropout: {}
+Model input: {}
 Objective: {}
 Viterbi margin scheme: {}
 
-""".format(options.dataset, options.word_embeddings, options.num_epochs, options.lstm_layers, options.hidden_dim,
-           options.learning_rate, options.dropout, objective, options.loss_margin))
+""".format(options.dataset, options.model_file, objective, options.loss_margin))
 
 if options.debug:
     print "DEBUG MODE"
@@ -484,22 +396,16 @@ i2ts = { att: {i: t for t, i in t2i.items()} for att, t2i in t2is.items() }
 i2c = { i: c for c, i in c2i.items() }
 
 tag_lists = { att: [ i2t[idx] for idx in xrange(len(i2t)) ] for att, i2t in i2ts.items() } # To use in the confusion matrix
-training_instances = dataset["training_instances"]
 training_vocab = dataset["training_vocab"]
-dev_instances = dataset["dev_instances"]
-dev_vocab = dataset["dev_vocab"]
+test_instances = dataset["test_instances"]
 
 
 # ===-----------------------------------------------------------------------===
-# Build model and trainer
+# Load model
 # ===-----------------------------------------------------------------------===
-if options.word_embeddings is not None:
-    word_embeddings = utils.read_pretrained_embeddings(options.word_embeddings, w2i)
-else:
-    word_embeddings = None
 
 tag_set_sizes = { att: len(t2i) for att, t2i in t2is.items() }
-if options.no_sequence_model:
+if options.no_sequence_model: # NOT IMPLEMENTED YET
     model = LSTMTagger(tagset_sizes=tag_set_sizes,
                        num_lstm_layers=options.lstm_layers,
                        hidden_dim=options.hidden_dim,
@@ -529,184 +435,77 @@ else:
     elif options.loss_margin == "zero":
         margins = {att:0.0 for att in t2is.keys()}
     elif options.loss_margin == "att-prop":
-        margins = get_att_prop(training_instances)
-    model = BiLSTM_CRF(tag_set_sizes,
-                       options.lstm_layers,
-                       options.hidden_dim,
-                       word_embeddings,
-                       morpheme_embeddings,
-                       morpheme_projection,
-                       morpheme_decomps,
-                       options.use_char_rnn,
-                       len(c2i),
-                       training_vocab,
-                       margins)
+        margins = get_att_prop(dataset["training_instances"])
+    model = BiLSTM_CRF(options.model_file, options.use_char_rnn, tag_set_sizes, training_vocab, margins)
 
+logging.info("Number test instances: {}".format(len(test_instances)))
 
-trainer = dy.MomentumSGDTrainer(model.model, options.learning_rate, 0.9, 0.1)
-logging.info("Training Algorithm: {}".format(type(trainer)))
-
-logging.info("Number training instances: {}".format(len(training_instances)))
-logging.info("Number dev instances: {}".format(len(dev_instances)))
-
-for epoch in xrange(int(options.num_epochs)):
-    bar = progressbar.ProgressBar()
-    random.shuffle(training_instances)
-    train_loss = 0.0
-    train_correct = Counter()
-    train_total = Counter()
-
-    if options.dropout > 0:
-        model.set_dropout(options.dropout)
-
-    if options.debug:
-        train_instances = training_instances[0:int(len(training_instances)/20)]
-    else:
-        train_instances = training_instances
-    
-    for instance in bar(train_instances):
+# Evaluate test data
+model.disable_dropout()
+test_correct = Counter()
+test_total = Counter()
+test_oov_total = Counter()
+bar = progressbar.ProgressBar()
+total_wrong = Counter()
+total_wrong_oov = Counter()
+f1_eval = Evaluator(m = 'att')
+if options.debug:
+    t_instances = test_instances[0:int(len(test_instances)/10)]
+else:
+    t_instances = test_instances
+with open("{}/testout.txt".format(options.out_dir), 'w') as test_writer:
+    for instance in bar(t_instances):
         if len(instance.sentence) == 0: continue
-
-        # TODO make the interface all the same here
-        if options.viterbi:
-            losses = []
+        if options.no_sequence_model:
             gold_tags = instance.tags
             for att in model.attributes:
                 if att not in instance.tags:
                     gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
-            loss_exprs, viterbi_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
-            for att, tags in gold_tags.items():
-                vit_tags = viterbi_tags_set[att]
-                l = loss_exprs[att].scalar_value()
-                # Record some info for training accuracy
-                if l > 0:
-                    for gold, viterbi in zip(tags, vit_tags):
-                        if gold == viterbi:
-                            train_correct[att] += 1
-                else:
-                    train_correct[att] += len(tags)
-                train_total[att] += len(tags)
-                losses.append(l)
-            loss_expr = dy.esum(loss_exprs.values()) # TODO or average
-        elif options.no_sequence_model:
-            gold_tags = instance.tags
-            for att in model.attributes:
-                if att not in instance.tags:
-                    gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
-            loss_exprs = model.loss(instance.sentence, gold_tags)
-            loss_expr = dy.esum(loss_exprs.values()) # TODO or average
+            out_tags_set = model.tag_sentence(instance.sentence)
         else:
-            loss_exprs = model.neg_log_loss(instance.sentence, instance.tags)
-            loss_expr = dy.esum(loss_exprs.values()) # TODO or average
-        loss = loss_expr.scalar_value()
+            gold_tags = instance.tags
+            for att in model.attributes:
+                if att not in instance.tags:
+                    gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
+            _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
+            
+        gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
+        obs_strings = utils.morphotag_strings(i2ts, out_tags_set, options.pos_separate_col)
+        test_writer.write("\n"
+                         + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
+                                                                     gold_strings, obs_strings)])
+                         + "\n")
+        for g, o in zip(gold_strings, obs_strings):
+            f1_eval.add_instance(utils.split_tagstring(g), utils.split_tagstring(o))
+        for att, tags in gold_tags.items():
+            out_tags = out_tags_set[att]
+            correct_sent = True
 
-        # Bail if loss is NaN
-        if math.isnan(loss):
-            assert False, "NaN occured"
-
-        train_loss += (loss / len(instance.sentence))
-
-        # Do backward pass and update parameters
-        loss_expr.backward()
-        trainer.update()
-
-    logging.info("\n")
-    logging.info("Epoch {} complete".format(epoch + 1))
-    trainer.update_epoch(1)
-    print trainer.status()
-
-    # Evaluate dev data
-    model.disable_dropout()
-    dev_loss = 0.0
-    dev_correct = Counter()
-    dev_total = Counter()
-    dev_oov_total = Counter()
-    bar = progressbar.ProgressBar()
-    total_wrong = Counter()
-    total_wrong_oov = Counter()
-    f1_eval = Evaluator(m = 'att')
-    if options.debug:
-        d_instances = dev_instances[0:int(len(dev_instances)/10)]
-    else:
-        d_instances = dev_instances
-    with open("{}/devout_epoch-{:02d}.txt".format(options.log_dir, epoch + 1), 'w') as dev_writer:
-        for instance in bar(d_instances):
-            if len(instance.sentence) == 0: continue
-            if options.no_sequence_model:
-                gold_tags = instance.tags
-                for att in model.attributes:
-                    if att not in instance.tags:
-                        gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
-                losses = model.loss(instance.sentence, gold_tags)
-                total_loss = sum([l.scalar_value() for l in losses.values()]) # TODO or average
-                out_tags_set = model.tag_sentence(instance.sentence)
-            else:
-                gold_tags = instance.tags
-                for att in model.attributes:
-                    if att not in instance.tags:
-                        gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
-                losses = model.neg_log_loss(instance.sentence, gold_tags)
-                total_loss = sum([l.value() for l in losses.values()]) # TODO or average
-                _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
-                
-            gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
-            obs_strings = utils.morphotag_strings(i2ts, out_tags_set, options.pos_separate_col)
-            dev_writer.write("\n"
-                             + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
-                                                                         gold_strings, obs_strings)])
-                             + "\n")
-            for g, o in zip(gold_strings, obs_strings):
-                f1_eval.add_instance(utils.split_tagstring(g), utils.split_tagstring(o))
-            for att, tags in gold_tags.items():
-                out_tags = out_tags_set[att]
-                correct_sent = True
-
-                for word, gold, out in zip(instance.sentence, tags, out_tags):
-                    if gold == out:
-                        dev_correct[att] += 1
-                    else:
-                        # Got the wrong tag
-                        total_wrong[att] += 1
-                        correct_sent = False
-                        if i2w[word] not in training_vocab:
-                            total_wrong_oov[att] += 1
-                    
+            for word, gold, out in zip(instance.sentence, tags, out_tags):
+                if gold == out:
+                    test_correct[att] += 1
+                else:
+                    # Got the wrong tag
+                    total_wrong[att] += 1
+                    correct_sent = False
                     if i2w[word] not in training_vocab:
-                        dev_oov_total[att] += 1
-                # if not correct_sent:
-                #     sent, tags = utils.convert_instance(instance, i2w, i2t)
-                #     for i in range(len(sent)):
-                #         logging.info( sent[i] + "\t" + tags[i] + "\t" + i2t[viterbi_tags[i]] )
-                #     logging.info( "\n\n\n" )
-                dev_total[att] += len(tags)
+                        total_wrong_oov[att] += 1
                 
-            dev_loss += (total_loss / len(instance.sentence))
+                if i2w[word] not in training_vocab:
+                    test_oov_total[att] += 1
+            # if not correct_sent:
+            #     sent, tags = utils.convert_instance(instance, i2w, i2t)
+            #     for i in range(len(sent)):
+            #         logging.info( sent[i] + "\t" + tags[i] + "\t" + i2t[viterbi_tags[i]] )
+            #     logging.info( "\n\n\n" )
+            test_total[att] += len(tags)
 
-    if options.viterbi:
-        logging.info("POS Train Accuracy: {}".format(train_correct[POS_KEY] / train_total[POS_KEY]))
-    logging.info("POS Dev Accuracy: {}".format(dev_correct[POS_KEY] / dev_total[POS_KEY]))
-    logging.info("POS % OOV accuracy: {}".format((dev_oov_total[POS_KEY] - total_wrong_oov[POS_KEY]) / dev_oov_total[POS_KEY]))
-    if total_wrong[POS_KEY] > 0:
-        logging.info("POS % Wrong that are OOV: {}".format(total_wrong_oov[POS_KEY] / total_wrong[POS_KEY]))
-    for attr in t2is.keys():
-        if attr != POS_KEY:
-            logging.info("{} F1: {}".format(attr, f1_eval.mic_f1(att = attr)))
-    logging.info("Total attribute F1s: {} micro, {} macro, POS included = {}".format(f1_eval.mic_f1(), f1_eval.mac_f1(), not options.pos_separate_col))
-
-    train_loss = train_loss / len(train_instances)
-    dev_loss = dev_loss / len(d_instances)
-    logging.info("Train Loss: {}".format(train_loss))
-    logging.info("Dev Loss: {}".format(dev_loss))
-    train_dev_cost.add_column([train_loss, dev_loss])
-    
-    # Serialize model
-    new_model_file_name = "{}/model_epoch-{:02d}.bin".format(options.log_dir, epoch + 1)
-    logging.info("Saving model to {}".format(new_model_file_name))
-    model.save(new_model_file_name) # TODO also save non-internal model stuff like mappings
-    if epoch > 1 and epoch % 10 != 0: # leave models from epochs 1,10,20, etc.
-        logging.info("Removing files from previous epoch.")
-        old_model_file_name = "{}/model_epoch-{:02d}.bin".format(options.log_dir, epoch)
-        os.remove(old_model_file_name)
-        old_devout_file_name = "{}/devout_epoch-{:02d}.txt".format(options.log_dir, epoch)
-        os.remove(old_devout_file_name)
+logging.info("POS Test Accuracy: {}".format(test_correct[POS_KEY] / test_total[POS_KEY]))
+logging.info("POS % OOV accuracy: {}".format((test_oov_total[POS_KEY] - total_wrong_oov[POS_KEY]) / test_oov_total[POS_KEY]))
+if total_wrong[POS_KEY] > 0:
+    logging.info("POS % Wrong that are OOV: {}".format(total_wrong_oov[POS_KEY] / total_wrong[POS_KEY]))
+for attr in t2is.keys():
+    if attr != POS_KEY:
+        logging.info("{} F1: {}".format(attr, f1_eval.mic_f1(att = attr)))
+logging.info("Total attribute F1s: {} micro, {} macro, POS included = {}".format(f1_eval.mic_f1(), f1_eval.mac_f1(), not options.pos_separate_col))
     
