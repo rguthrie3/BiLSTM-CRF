@@ -488,6 +488,7 @@ training_instances = dataset["training_instances"]
 training_vocab = dataset["training_vocab"]
 dev_instances = dataset["dev_instances"]
 dev_vocab = dataset["dev_vocab"]
+test_instances = dataset["test_instances"]
 
 
 # ===-----------------------------------------------------------------------===
@@ -709,4 +710,76 @@ for epoch in xrange(int(options.num_epochs)):
         os.remove(old_model_file_name)
         old_devout_file_name = "{}/devout_epoch-{:02d}.txt".format(options.log_dir, epoch)
         os.remove(old_devout_file_name)
-    
+
+
+
+# Evaluate test data (once)
+logging.info("\n")
+logging.info("Number test instances: {}".format(len(test_instances)))
+model.disable_dropout()
+test_correct = Counter()
+test_total = Counter()
+test_oov_total = Counter()
+bar = progressbar.ProgressBar()
+total_wrong = Counter()
+total_wrong_oov = Counter()
+f1_eval = Evaluator(m = 'att')
+if options.debug:
+    t_instances = test_instances[0:int(len(test_instances)/10)]
+else:
+    t_instances = test_instances
+with open("{}/testout.txt".format(options.log_dir), 'w') as test_writer:
+    for instance in bar(t_instances):
+        if len(instance.sentence) == 0: continue
+        if options.no_sequence_model:
+            gold_tags = instance.tags
+            for att in model.attributes:
+                if att not in instance.tags:
+                    gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
+            out_tags_set = model.tag_sentence(instance.sentence)
+        else:
+            gold_tags = instance.tags
+            for att in model.attributes:
+                if att not in instance.tags:
+                    gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
+            _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
+            
+        gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
+        obs_strings = utils.morphotag_strings(i2ts, out_tags_set, options.pos_separate_col)
+        test_writer.write("\n"
+                         + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
+                                                                     gold_strings, obs_strings)])
+                         + "\n")
+        for g, o in zip(gold_strings, obs_strings):
+            f1_eval.add_instance(utils.split_tagstring(g), utils.split_tagstring(o))
+        for att, tags in gold_tags.items():
+            out_tags = out_tags_set[att]
+            correct_sent = True
+
+            for word, gold, out in zip(instance.sentence, tags, out_tags):
+                if gold == out:
+                    test_correct[att] += 1
+                else:
+                    # Got the wrong tag
+                    total_wrong[att] += 1
+                    correct_sent = False
+                    if i2w[word] not in training_vocab:
+                        total_wrong_oov[att] += 1
+                
+                if i2w[word] not in training_vocab:
+                    test_oov_total[att] += 1
+            # if not correct_sent:
+            #     sent, tags = utils.convert_instance(instance, i2w, i2t)
+            #     for i in range(len(sent)):
+            #         logging.info( sent[i] + "\t" + tags[i] + "\t" + i2t[viterbi_tags[i]] )
+            #     logging.info( "\n\n\n" )
+            test_total[att] += len(tags)
+
+logging.info("POS Test Accuracy: {}".format(test_correct[POS_KEY] / test_total[POS_KEY]))
+logging.info("POS % OOV accuracy: {}".format((test_oov_total[POS_KEY] - total_wrong_oov[POS_KEY]) / test_oov_total[POS_KEY]))
+if total_wrong[POS_KEY] > 0:
+    logging.info("POS % Wrong that are OOV: {}".format(total_wrong_oov[POS_KEY] / total_wrong[POS_KEY]))
+for attr in t2is.keys():
+    if attr != POS_KEY:
+        logging.info("{} F1: {}".format(attr, f1_eval.mic_f1(att = attr)))
+logging.info("Total attribute F1s: {} micro, {} macro, POS included = {}".format(f1_eval.mic_f1(), f1_eval.mac_f1(), not options.pos_separate_col))
