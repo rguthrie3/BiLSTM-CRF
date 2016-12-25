@@ -168,13 +168,13 @@ class BiLSTM_CRF:
         return score
 
 
-    def viterbi_loss(self, sentence, tags_set):
+    def viterbi_loss(self, sentence, tags_set, use_margins=True):
         observations_set = self.build_tagging_graph(sentence)
         losses = {}
         ret_tags = {}
         for att, observations in observations_set.items():
             tags = tags_set[att]
-            viterbi_tags, viterbi_score = self.viterbi_decoding(observations, tags, att)
+            viterbi_tags, viterbi_score = self.viterbi_decoding(observations, tags, att, use_margins)
             if viterbi_tags != tags:
                 gold_score = self.score_sentence(observations, tags, att)
                 losses[att] = viterbi_score - gold_score
@@ -222,7 +222,7 @@ class BiLSTM_CRF:
         return alpha
 
 
-    def viterbi_decoding(self, observations, gold_tags, att):
+    def viterbi_decoding(self, observations, gold_tags, att, use_margins):
         t2i = t2is[att]
         tagset_size = self.tagset_sizes[att]
         backpointers = []
@@ -240,7 +240,7 @@ class BiLSTM_CRF:
                 bptrs_t.append(best_tag_id)
                 vvars_t.append(dy.pick(next_tag_expr, best_tag_id))
             for_expr = dy.concatenate(vvars_t) + obs
-            if self.margins[att] != 0:
+            if use_margins and self.margins[att] != 0:
                 adjust = [self.margins[att]] * tagset_size
                 adjust[gold] = 0
                 for_expr = for_expr + dy.inputVector(adjust)
@@ -669,14 +669,14 @@ for epoch in xrange(int(options.num_epochs)):
                         gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
                 losses = model.neg_log_loss(instance.sentence, gold_tags)
                 total_loss = sum([l.value() for l in losses.values()]) # TODO or average
-                _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
+                _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags, use_margins=False)
                 
             gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
             obs_strings = utils.morphotag_strings(i2ts, out_tags_set, options.pos_separate_col)
-            dev_writer.write("\n"
-                             + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
-                                                                         gold_strings, obs_strings)])
-                             + "\n")
+            #dev_writer.write("\n"
+            #                 + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
+            #                                                             gold_strings, obs_strings)])
+            #                 + "\n")
             for g, o in zip(gold_strings, obs_strings):
                 f1_eval.add_instance(utils.split_tagstring(g), utils.split_tagstring(o))
             for att, tags in gold_tags.items():
@@ -766,14 +766,14 @@ with open("{}/testout.txt".format(options.log_dir), 'w') as test_writer:
             for att in model.attributes:
                 if att not in instance.tags:
                     gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
-            _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags)
+            _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags, use_margins=False)
             
         gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
         obs_strings = utils.morphotag_strings(i2ts, out_tags_set, options.pos_separate_col)
-        test_writer.write("\n"
-                         + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
-                                                                     gold_strings, obs_strings)])
-                         + "\n")
+        #test_writer.write("\n"
+        #                 + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
+        #                                                             gold_strings, obs_strings)])
+        #                 + "\n")
         for g, o in zip(gold_strings, obs_strings):
             f1_eval.add_instance(utils.split_tagstring(g), utils.split_tagstring(o))
         for att, tags in gold_tags.items():

@@ -33,10 +33,9 @@ def get_next_att_batch(attributes, att_tuple, idx):
     
 class BiLSTM_CRF:
 
-    def __init__(self, rnn_model, use_char_rnn, tagset_sizes, train_vocab_ctr, margins):
+    def __init__(self, rnn_model, use_char_rnn, tagset_sizes, train_vocab_ctr):
         self.tagset_sizes = tagset_sizes
         self.train_vocab_ctr = train_vocab_ctr
-        self.margins = margins
         self.use_char_rnn = use_char_rnn
         
         self.model = dy.Model()
@@ -183,10 +182,7 @@ class BiLSTM_CRF:
                 bptrs_t.append(best_tag_id)
                 vvars_t.append(dy.pick(next_tag_expr, best_tag_id))
             for_expr = dy.concatenate(vvars_t) + obs
-            if self.margins[att] != 0:
-                adjust = [self.margins[att]] * tagset_size
-                adjust[gold] = 0
-                for_expr = for_expr + dy.inputVector(adjust)
+            # No margins! Testing only.
             backpointers.append(bptrs_t)
         # Perform final transition to terminal
         terminal_expr = for_expr + trans_exprs[t2i[END_TAG]]
@@ -318,22 +314,26 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--dataset", required=True, dest="dataset", help=".pkl file to use")
 parser.add_argument("--model", required=True, dest="model_file", help="Model file to use (.bin)")
 parser.add_argument("--use-char-rnn", dest="use_char_rnn", action="store_true", help="Model being read has char RNN trained")
+parser.add_argument("--use-dev", dest="use_dev", action="store_true", help="Report on dev set instead of test")
 parser.add_argument("--morpheme-projection", dest="morpheme_projection", help="Pickle file containing projection matrix if applicable")
 parser.add_argument("--viterbi", dest="viterbi", action="store_true", help="Use viterbi training instead of CRF")
-parser.add_argument("--loss-margin", default="one", dest="loss_margin", help="Loss margin calculation method in sequence tagger (currently only supported in Viterbi). Supported values - one (default), zero, att-prop (attribute proportional)")
 parser.add_argument("--no-sequence-model", dest="no_sequence_model", action="store_true", help="Use regular LSTM tagger with no viterbi")
 parser.add_argument("--out-dir", default="out", dest="out_dir", help="Directory where to write output")
 parser.add_argument("--pos-separate-col", default=True, dest="pos_separate_col", help="Output examples have POS in separate column")
 parser.add_argument("--debug", dest="debug", action="store_true", help="Debug mode")
 options = parser.parse_args()
 
+if options.use_dev:
+    devortest = "dev"
+else:
+    devortest = "test"
 
 # ===-----------------------------------------------------------------------===
 # Set up logging
 # ===-----------------------------------------------------------------------===
 if not os.path.exists(options.out_dir):
     os.mkdir(options.out_dir)
-logging.basicConfig(filename=options.out_dir + "/out.txt", filemode="w", format="%(message)s", level=logging.INFO)
+logging.basicConfig(filename=options.out_dir + "/out-{}.txt".format(devortest), filemode="w", format="%(message)s", level=logging.INFO)
 
 
 # ===-----------------------------------------------------------------------===
@@ -348,11 +348,11 @@ else:
 logging.info(
 """
 Dataset: {}
+Using Dev instead of Test: {}
 Model input: {}
 Objective: {}
-Viterbi margin scheme: {}
 
-""".format(options.dataset, options.model_file, objective, options.loss_margin))
+""".format(options.dataset, options.use_dev, options.model_file, objective))
 
 if options.debug:
     print "DEBUG MODE"
@@ -372,7 +372,10 @@ i2c = { i: c for c, i in c2i.items() }
 
 tag_lists = { att: [ i2t[idx] for idx in xrange(len(i2t)) ] for att, i2t in i2ts.items() } # To use in the confusion matrix
 training_vocab = dataset["training_vocab"]
-test_instances = dataset["test_instances"]
+if options.use_dev:
+    test_instances = dataset["dev_instances"]
+else:
+    test_instances = dataset["test_instances"]
 
 
 # ===-----------------------------------------------------------------------===
@@ -395,17 +398,9 @@ else:
     morpheme_projection = None
     morpheme_decomps = None
     #morpheme_decomps = dataset["morpheme_segmentations"]
-    if not options.viterbi:
-        margins = None
-    elif options.loss_margin == "one":
-        margins = {att:1.0 for att in t2is.keys()}
-    elif options.loss_margin == "zero":
-        margins = {att:0.0 for att in t2is.keys()}
-    elif options.loss_margin == "att-prop":
-        margins = get_att_prop(dataset["training_instances"])
-    model = BiLSTM_CRF(options.model_file, options.use_char_rnn, tag_set_sizes, training_vocab, margins)
+    model = BiLSTM_CRF(options.model_file, options.use_char_rnn, tag_set_sizes, training_vocab)
 
-logging.info("Number test instances: {}".format(len(test_instances)))
+logging.info("Number {} instances: {}".format(devortest, len(test_instances)))
 
 # Evaluate test data
 model.disable_dropout()
@@ -420,7 +415,7 @@ if options.debug:
     t_instances = test_instances[0:int(len(test_instances)/10)]
 else:
     t_instances = test_instances
-with open("{}/testout.txt".format(options.out_dir), 'w') as test_writer:
+with open("{}/{}out.txt".format(options.out_dir, devortest), 'w') as test_writer:
     for instance in bar(t_instances):
         if len(instance.sentence) == 0: continue
         if options.no_sequence_model:
@@ -467,7 +462,11 @@ with open("{}/testout.txt".format(options.out_dir), 'w') as test_writer:
             #     logging.info( "\n\n\n" )
             test_total[att] += len(tags)
 
-logging.info("POS Test Accuracy: {}".format(test_correct[POS_KEY] / test_total[POS_KEY]))
+            
+if options.use_dev:
+    logging.info("POS Dev Accuracy: {}".format(test_correct[POS_KEY] / test_total[POS_KEY]))
+else:
+    logging.info("POS Test Accuracy: {}".format(test_correct[POS_KEY] / test_total[POS_KEY]))
 logging.info("POS % OOV accuracy: {}".format((test_oov_total[POS_KEY] - total_wrong_oov[POS_KEY]) / test_oov_total[POS_KEY]))
 if total_wrong[POS_KEY] > 0:
     logging.info("POS % Wrong that are OOV: {}".format(total_wrong_oov[POS_KEY] / total_wrong[POS_KEY]))
