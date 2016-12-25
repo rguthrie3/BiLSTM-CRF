@@ -673,10 +673,10 @@ for epoch in xrange(int(options.num_epochs)):
                 
             gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
             obs_strings = utils.morphotag_strings(i2ts, out_tags_set, options.pos_separate_col)
-            #dev_writer.write("\n"
-            #                 + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
-            #                                                             gold_strings, obs_strings)])
-            #                 + "\n")
+            dev_writer.write(("\n"
+                             + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
+                                                                         gold_strings, obs_strings)])
+                             + "\n").encode('utf8'))
             for g, o in zip(gold_strings, obs_strings):
                 f1_eval.add_instance(utils.split_tagstring(g), utils.split_tagstring(o))
             for att, tags in gold_tags.items():
@@ -770,10 +770,10 @@ with open("{}/testout.txt".format(options.log_dir), 'w') as test_writer:
             
         gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
         obs_strings = utils.morphotag_strings(i2ts, out_tags_set, options.pos_separate_col)
-        #test_writer.write("\n"
-        #                 + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
-        #                                                             gold_strings, obs_strings)])
-        #                 + "\n")
+        test_writer.write(("\n"
+                         + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
+                                                                     gold_strings, obs_strings)])
+                         + "\n").encode('utf8'))
         for g, o in zip(gold_strings, obs_strings):
             f1_eval.add_instance(utils.split_tagstring(g), utils.split_tagstring(o))
         for att, tags in gold_tags.items():
