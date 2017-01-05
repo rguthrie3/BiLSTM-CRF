@@ -51,3 +51,21 @@ python model.py --dataset results/it_mtags-pos.pkl --log-dir log-it-noseq-onlypo
 python model.py --dataset results/da_mtags-pos.pkl --log-dir log-da-noseq-onlypos-randinit-char --no-sequence-model --use-char-rnn --num-epochs 20;
 python model.py --dataset results/it_mtags-dd.pkl --log-dir log-it-noseq-randinit-char --no-sequence-model --use-char-rnn --num-epochs 20;
 python model.py --dataset results/da_mtags-dd.pkl --log-dir log-da-noseq-randinit-char --no-sequence-model --use-char-rnn --num-epochs 20;
+# CELEX initialization (1/4):
+python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_celex_vectors_varembed_ud.txt --log-dir log-onlypos-noseq-celinit-char-05dr --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_celex_vectors_varembed_ud.txt --log-dir log-noseq-celinit-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_celex_vectors_varembed_ud.txt --log-dir log-noseq-celinit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+# Checking on 1.2 dataset (1/4):
+python model.py --dataset results/en_mtags-12-pos.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-ud12-onlypos-noseq-varinit-char-05dr --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-12-dd.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-ud12-noseq-varinit-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-12-dd.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-ud12-noseq-varinit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+# Char-LSTM embeddings (1/4):
+python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en-char-lstm-embeddings.txt --log-dir log-onlypos-noseq-charinit-char-05dr --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en-char-lstm-embeddings.txt --log-dir log-noseq-charinit-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en-char-lstm-embeddings.txt --log-dir log-noseq-charinit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+# Retesting basic LSTM arch for sum loss instead of average (1/4):
+python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-onlypos-noseq-varinit-char-05dr --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-noseq-varinit-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-noseq-varinit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-dd.pkl --log-dir log-noseq-randinit-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-dd.pkl --log-dir log-noseq-randinit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
