@@ -1,4 +1,4 @@
-# 12/20
+nJ# 12/20
 python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-noseq-varinit-char-05dr-avgtags --dev-output log-noseq-varinit-char-05dr-avgtags/devout.txt --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
 python model.py --dataset results/en_mtags-dd.pkl --log-dir log-noseq-randinit-char-05dr-avgtags --dev-output log-noseq-randinit-char-05dr-avgtags/devout.txt --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
 python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-noseq-varinit-nochar-05dr-avgtags --dev-output log-noseq-varinit-nochar-05dr-avgtags/devout.txt --dropout 0.5 --no-sequence-model --num-epochs 40;
@@ -69,3 +69,36 @@ python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en
 python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-noseq-varinit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
 python model.py --dataset results/en_mtags-dd.pkl --log-dir log-noseq-randinit-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
 python model.py --dataset results/en_mtags-dd.pkl --log-dir log-noseq-randinit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+# Jan 5
+python model.py --dataset results/en_mtags-pos.pkl --log-dir log-onlypos-noseq-randinit-char-05dr --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-pos.pkl --log-dir log-onlypos-noseq-randinit-nochar-05dr --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-onlypos-noseq-varinit-nochar-05dr --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en-char-lstm-embeddings.txt --log-dir log-onlypos-noseq-charinit-nochar-05dr --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_celex_vectors_varembed_ud.txt --log-dir log-onlypos-noseq-celinit-nochar-05dr --dropout 0.5 --no-sequence-model --num-epochs 40;
+# Jan 6
+python model.py --dataset results/it_mtags-pos.pkl --word-embeddings data/embs/it-char-embeds.txt --log-dir log-it-onlypos-noseq-charinit-char-05dr --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/it_mtags-pos.pkl --word-embeddings data/embs/it-char-embeds.txt --log-dir log-it-onlypos-noseq-charinit-nochar-05dr --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/it_mtags-dd.pkl --word-embeddings data/embs/it-char-embeds.txt --log-dir log-it-noseq-charinit-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/it_mtags-dd.pkl --word-embeddings data/embs/it-char-embeds.txt --log-dir log-it-noseq-charinit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/it_mtags-pos.pkl --log-dir log-it-noseq-onlypos-randinit-nochar-05dr --no-sequence-model --dropout 0.5 --num-epochs 40;
+python model.py --dataset results/it_mtags-dd.pkl --log-dir log-it-noseq-randinit-nochar-05dr --no-sequence-model --dropout 0.5 --num-epochs 40;
+python model.py --dataset results/it_mtags-pos.pkl --log-dir log-it-noseq-onlypos-randinit-char-05dr --no-sequence-model --use-char-rnn --dropout 0.5 --num-epochs 40;
+python model.py --dataset results/it_mtags-dd.pkl --log-dir log-it-noseq-randinit-char-05dr --no-sequence-model --use-char-rnn --dropout 0.5 --num-epochs 40;
+python model.py --dataset results/it_mtags-pos.pkl --word-embeddings data/embs/it_wiki_vectors_varembed_ud.txt --log-dir log-it-noseq-onlypos-varinit-nochar-05dr --no-sequence-model --dropout 0.5 --num-epochs 40;
+python model.py --dataset results/it_mtags-dd.pkl --word-embeddings data/embs/it_wiki_vectors_varembed_ud.txt --log-dir log-it-noseq-varinit-nochar-05dr --no-sequence-model --dropout 0.5 --num-epochs 40;
+python model.py --dataset results/it_mtags-pos.pkl --word-embeddings data/embs/it_wiki_vectors_varembed_ud.txt --log-dir log-it-noseq-onlypos-varinit-char-05dr --no-sequence-model --use-char-rnn --dropout 0.5 --num-epochs 40;
+python model.py --dataset results/it_mtags-dd.pkl --word-embeddings data/embs/it_wiki_vectors_varembed_ud.txt --log-dir log-it-noseq-varinit-char-05dr --no-sequence-model --use-char-rnn --dropout 0.5 --num-epochs 40;
+# Jan 8
+python model.py --dataset results/da_mtags-pos.pkl --word-embeddings data/embs/da-char-embeds.txt --log-dir log-da-onlypos-noseq-charinit-char-05dr --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/da_mtags-pos.pkl --word-embeddings data/embs/da-char-embeds.txt --log-dir log-da-onlypos-noseq-charinit-nochar-05dr --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/da_mtags-dd.pkl --word-embeddings data/embs/da-char-embeds.txt --log-dir log-da-noseq-charinit-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/da_mtags-dd.pkl --word-embeddings data/embs/da-char-embeds.txt --log-dir log-da-noseq-charinit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/da_mtags-pos.pkl --log-dir log-da-noseq-onlypos-randinit-nochar-05dr --no-sequence-model --dropout 0.5 --num-epochs 40;
+python model.py --dataset results/da_mtags-dd.pkl --log-dir log-da-noseq-randinit-nochar-05dr --no-sequence-model --dropout 0.5 --num-epochs 40;
+python model.py --dataset results/da_mtags-pos.pkl --log-dir log-da-noseq-onlypos-randinit-char-05dr --no-sequence-model --use-char-rnn --dropout 0.5 --num-epochs 40;
+python model.py --dataset results/da_mtags-dd.pkl --log-dir log-da-noseq-randinit-char-05dr --no-sequence-model --use-char-rnn --dropout 0.5 --num-epochs 40;
+python model.py --dataset results/da_mtags-pos.pkl --word-embeddings data/embs/da_wiki_vectors_varembed_ud.txt --log-dir log-da-noseq-onlypos-varinit-nochar-05dr --no-sequence-model --dropout 0.5 --num-epochs 40;
+python model.py --dataset results/da_mtags-dd.pkl --word-embeddings data/embs/da_wiki_vectors_varembed_ud.txt --log-dir log-da-noseq-varinit-nochar-05dr --no-sequence-model --dropout 0.5 --num-epochs 40;
+python model.py --dataset results/da_mtags-pos.pkl --word-embeddings data/embs/da_wiki_vectors_varembed_ud.txt --log-dir log-da-noseq-onlypos-varinit-char-05dr --no-sequence-model --use-char-rnn --dropout 0.5 --num-epochs 40;
+python model.py --dataset results/da_mtags-dd.pkl --word-embeddings data/embs/da_wiki_vectors_varembed_ud.txt --log-dir log-da-noseq-varinit-char-05dr --no-sequence-model --use-char-rnn --dropout 0.5 --num-epochs 40;
+
