@@ -474,4 +474,4 @@ for attr in t2is.keys():
     if attr != POS_KEY:
         logging.info("{} F1: {}".format(attr, f1_eval.mic_f1(att = attr)))
 logging.info("Total attribute F1s: {} micro, {} macro, POS included = {}".format(f1_eval.mic_f1(), f1_eval.mac_f1(), not options.pos_separate_col))
-    
+logging.info("Total tokens: {}, Total OOV: {}, % OOV: {}".format(test_total[POS_KEY], test_oov_total[POS_KEY], test_oov_total[POS_KEY] / test_total[POS_KEY]))
