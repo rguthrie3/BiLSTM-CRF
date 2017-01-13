@@ -101,4 +101,16 @@ python model.py --dataset results/da_mtags-pos.pkl --word-embeddings data/embs/d
 python model.py --dataset results/da_mtags-dd.pkl --word-embeddings data/embs/da_wiki_vectors_varembed_ud.txt --log-dir log-da-noseq-varinit-nochar-05dr --no-sequence-model --dropout 0.5 --num-epochs 40;
 python model.py --dataset results/da_mtags-pos.pkl --word-embeddings data/embs/da_wiki_vectors_varembed_ud.txt --log-dir log-da-noseq-onlypos-varinit-char-05dr --no-sequence-model --use-char-rnn --dropout 0.5 --num-epochs 40;
 python model.py --dataset results/da_mtags-dd.pkl --word-embeddings data/embs/da_wiki_vectors_varembed_ud.txt --log-dir log-da-noseq-varinit-char-05dr --no-sequence-model --use-char-rnn --dropout 0.5 --num-epochs 40;
-
+# Jan 13 - Polyglot
+python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_polyglot_vectors_ud.txt --log-dir log-noseq-pginit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_polyglot_vectors_ud.txt --log-dir log-noseq-pginit-char-05dr-sumtags --dropout 0.5 --no-sequence-model --use-char-rnn --num-epochs 40;
+python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_polyglot_vectors_ud.txt --log-dir log-onlypos-noseq-pginit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_polyglot_vectors_ud.txt --log-dir log-onlypos-noseq-pginit-char-05dr-sumtags --dropout 0.5 --no-sequence-model --use-char-rnn --num-epochs 40;
+python model.py --dataset results/da_mtags-dd.pkl --word-embeddings data/embs/da_polyglot_vectors_ud.txt --log-dir log-da-noseq-pginit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/da_mtags-dd.pkl --word-embeddings data/embs/da_polyglot_vectors_ud.txt --log-dir log-da-noseq-pginit-char-05dr-sumtags --dropout 0.5 --no-sequence-model --use-char-rnn --num-epochs 40;
+python model.py --dataset results/da_mtags-pos.pkl --word-embeddings data/embs/da_polyglot_vectors_ud.txt --log-dir log-da-onlypos-noseq-pginit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/da_mtags-pos.pkl --word-embeddings data/embs/da_polyglot_vectors_ud.txt --log-dir log-da-onlypos-noseq-pginit-char-05dr-sumtags --dropout 0.5 --no-sequence-model --use-char-rnn --num-epochs 40;
+python model.py --dataset results/it_mtags-dd.pkl --word-embeddings data/embs/it_polyglot_vectors_ud.txt --log-dir log-it-noseq-pginit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/it_mtags-dd.pkl --word-embeddings data/embs/it_polyglot_vectors_ud.txt --log-dir log-it-noseq-pginit-char-05dr-sumtags --dropout 0.5 --no-sequence-model --use-char-rnn --num-epochs 40;
+python model.py --dataset results/it_mtags-pos.pkl --word-embeddings data/embs/it_polyglot_vectors_ud.txt --log-dir log-it-onlypos-noseq-pginit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/it_mtags-pos.pkl --word-embeddings data/embs/it_polyglot_vectors_ud.txt --log-dir log-it-onlypos-noseq-pginit-char-05dr-sumtags --dropout 0.5 --no-sequence-model --use-char-rnn --num-epochs 40;
