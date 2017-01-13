@@ -1,3 +1,4 @@
+from __future__ import division
 import cPickle
 import argparse
 import morfessor
@@ -18,7 +19,33 @@ parser.add_argument("--lowercase-backoff", dest="lowercase_backoff", action="sto
 parser.add_argument("--in-vocab-only", dest="in_vocab_only", action="store_true", help="Only output an embedding if it is in-vocab")
 parser.add_argument("--morpho-only", dest="morpho_only", action="store_true", help="Only use the morpheme embeddings")
 parser.add_argument("--sum-embed", dest="sum_embed", action="store_true", help="Flag to generate embeddings for SumEmbed model")
+parser.add_argument("--polyglot", dest="polyglot", action="store_true", help="Model is Polyglot")
 options = parser.parse_args()
+
+# Read in the output vocab
+with codecs.open(options.vocab, "r", "utf-8") as f:
+    output_words = set([ line.strip() for line in f ])
+
+# Polyglot is easy
+if options.polyglot:
+    words, embs = cPickle.load(open(options.vectors, "r"))
+    word_to_ix = {w : i for (i,w) in enumerate(words)}
+    with codecs.open("word_and_morpho_embeds.txt", "w", "utf-8") as outfile:
+        in_vocab = 0
+        total = len(output_words)
+        for orig_word in output_words:
+            if orig_word not in words and options.lowercase_backoff:
+                word = word.lower()
+            else:
+                word = orig_word
+            if word in words:
+                embed = embs[word_to_ix[word]]
+                output_word_vector(orig_word, embed, outfile)
+                in_vocab += 1
+        print "Total Number of output words:", total
+        print "Total in Training Vocabulary:", in_vocab
+        print "Percentage in-vocab:", in_vocab / total
+    exit()
 
 # Read in model
 D = cPickle.load(open(options.vectors, "r"))
@@ -28,10 +55,6 @@ word_embeddings = D["word_embeddings"]
 morpho_embeddings = D["morpheme_embeddings"]
 if options.morfessor_model is not None:
     morfessor_model = morfessor.MorfessorIO().read_binary_model_file(options.morfessor_model)
-
-# Read in the output vocab
-with codecs.open(options.vocab, "r", "utf-8") as f:
-    output_words = set([ line.strip() for line in f ])
 
 # If we get an unknown morpheme, just use 0
 np.append(morpho_embeddings, np.zeros((1,morpho_embeddings.shape[1])), axis=0)
@@ -75,12 +98,11 @@ with codecs.open("word_and_morpho_embeds.txt", "w", "utf-8") as outfile:
                     embed = embed + morpho_embed
                 output_word_vector(orig_word, embed, outfile)
                 in_vocab += 1
-                out_vocab += 1
             elif not options.in_vocab_only:
                 embed = np.array([ morpho_embeddings[morpho_to_ix.get(m, -1)] for m in morfessor_model.viterbi_segment(word)[0] ]).sum(axis=0)
                 output_word_vector(orig_word, embed, outfile)
-                out_vocab += 1
+                out_vocab += 1	
         print "Total Number of wordvectors.org words:", total
         print "Total in Training Vocabulary:", in_vocab
         print "Total out of Training Vocabulary", out_vocab
-        print "Percentage in-vocab:", in_vocab / float(total)
+        print "Percentage in-vocab:", in_vocab / total
