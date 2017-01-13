@@ -552,11 +552,10 @@ else:
                        vocab_size=len(w2i))
 
 embs_shape = model.words_lookup.shape()
-print embs_shape
-if options.semi_supervised:
-    embs_tensor = dy.transpose(dy.concatenate_cols([model.words_lookup[i] for i in xrange(embs_shape[0])]))
-    flattened_embs = dy.inputVector(dy.reshape(embs_tensor, (embs_shape[0] * embs_shape[1], 1)).value())
-    frozen_embs = dy.nobackprop(dy.reshape(flattened_embs, embs_shape))
+#if options.semi_supervised:
+#    embs_tensor = dy.transpose(dy.concatenate_cols([model.words_lookup[i] for i in xrange(embs_shape[0])]))
+#    flattened_embs = dy.inputVector(dy.reshape(embs_tensor, (embs_shape[0] * embs_shape[1], 1)).value())
+#    frozen_embs = dy.nobackprop(dy.reshape(flattened_embs, embs_shape))
 
 trainer = dy.MomentumSGDTrainer(model.model, options.learning_rate, 0.9, 0.1)
 logging.info("Training Algorithm: {}".format(type(trainer)))
@@ -615,6 +614,7 @@ for epoch in xrange(int(options.num_epochs)):
             loss_expr = dy.esum(loss_exprs.values())
         if options.semi_supervised:
             # TODO try and only create embeddings_tensor once
+            frozen_embs = dy.reshape(dy.inputVector(word_embeddings.reshape(1, embs_shape[0] * embs_shape[1])[0]), embs_shape)
             embeddings_tensor = dy.transpose(dy.concatenate_cols([ model.words_lookup[i] for i in range(embs_shape[0]) ]))
             loss_expr = loss_expr + utils.kl_div(embeddings_tensor, frozen_embs)
         loss = loss_expr.scalar_value()
