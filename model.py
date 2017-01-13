@@ -438,6 +438,7 @@ parser.add_argument("--use-char-rnn", dest="use_char_rnn", action="store_true", 
 parser.add_argument("--semi-supervised", dest="semi_supervised", action="store_true", help="Add KL-div term")
 parser.add_argument("--log-dir", default="log", dest="log_dir", help="Directory where to write logs / serialized models")
 parser.add_argument("--pos-separate-col", default=True, dest="pos_separate_col", help="Output examples have POS in separate column")
+parser.add_argument("--dynet-mem", help="Ignore this outside argument")
 parser.add_argument("--debug", dest="debug", action="store_true", help="Debug mode")
 options = parser.parse_args()
 
@@ -551,12 +552,8 @@ else:
                        margins,
                        vocab_size=len(w2i))
 
+init_embs = list([list(we) for we in model.words_lookup])
 embs_shape = model.words_lookup.shape()
-print embs_shape
-if options.semi_supervised:
-    embs_tensor = dy.transpose(dy.concatenate_cols([model.words_lookup[i] for i in xrange(embs_shape[0])]))
-    flattened_embs = dy.inputVector(dy.reshape(embs_tensor, (embs_shape[0] * embs_shape[1], 1)).value())
-    frozen_embs = dy.nobackprop(dy.reshape(flattened_embs, embs_shape))
 
 trainer = dy.MomentumSGDTrainer(model.model, options.learning_rate, 0.9, 0.1)
 logging.info("Training Algorithm: {}".format(type(trainer)))
@@ -614,7 +611,9 @@ for epoch in xrange(int(options.num_epochs)):
             loss_exprs = model.neg_log_loss(instance.sentence, instance.tags)
             loss_expr = dy.esum(loss_exprs.values())
         if options.semi_supervised:
-            # TODO try and only create embeddings_tensor once
+            # TODO try and only create embeddings_tensor and/or frozen_embs once
+            #frozen_embs = dy.reshape(dy.inputVector(word_embeddings.reshape(1, embs_shape[0] * embs_shape[1])[0]), embs_shape)
+            frozen_embs = dy.nobackprop(dy.transpose(dy.concatenate_cols([ init_embs[i] for i in range(embs_shape[0]) ])))
             embeddings_tensor = dy.transpose(dy.concatenate_cols([ model.words_lookup[i] for i in range(embs_shape[0]) ]))
             loss_expr = loss_expr + utils.kl_div(embeddings_tensor, frozen_embs)
         loss = loss_expr.scalar_value()
