@@ -3,6 +3,7 @@ import itertools
 import codecs
 import numpy as np
 import matplotlib.pyplot as plt
+import dynet as dy
 from sklearn.metrics import confusion_matrix
 
 NONE_TAG = "<NONE>"
@@ -57,6 +58,22 @@ class ConfusionMatrix:
         plt.ylabel('True label')
         plt.xlabel('Predicted label')
         plt.show()
+
+
+def kl_div(x, y):
+    sig_x = dy.logistic(x)
+    exp_x = dy.exp(x)
+    exp_y = dy.exp(y)
+    exp_neg_x = dy.exp(-x)
+    exp_neg_y = dy.exp(-y)
+    shape = x.value().shape
+    matrix_size = shape[0] * shape[1]
+    ones = dy.reshape(dy.inputVector([1] * matrix_size), shape)
+    total = dy.cmult(sig_x, dy.log(ones + exp_neg_y) - dy.log(ones + exp_neg_x)) + dy.cmult(ones - sig_x, dy.log(ones + exp_y) - dy.log(ones +exp_x))
+    # now we average in a convoluted way
+    total_cols = dy.reshape(total, (1, matrix_size))
+    sum = dy.sum_cols(total_cols)
+    return dy.cdiv(sum, dy.inputVector([matrix_size]))
 
 
 def convert_instance(instance, i2w, i2t):
