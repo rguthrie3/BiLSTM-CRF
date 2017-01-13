@@ -43,20 +43,6 @@ class BiLSTM_CRF:
             word_embedding_dim = 128
             self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
         
-        # Morpheme embedding parameters
-        # morpheme_vocab_size = morpheme_embeddings.shape[0]
-        # morpheme_embedding_dim = morpheme_embeddings.shape[1]
-        self.morpheme_lookup = None
-        # self.morpheme_lookup = self.model.add_lookup_parameters((morpheme_vocab_size, morpheme_embedding_dim))
-        # self.morpheme_lookup.init_from_array(morpheme_embeddings)
-        # self.morpheme_decomps = morpheme_decomps
-
-        # if morpheme_projection is not None:
-        #     self.morpheme_projection = self.model.add_parameters((word_embedding_dim, morpheme_embedding_dim))
-        #     self.morpheme_projection.init_from_array(morpheme_projection)
-        # else:
-        #     self.morpheme_projection = None
-        
         # Char LSTM Parameters
         self.use_char_rnn = use_char_rnn
         if use_char_rnn:
@@ -449,6 +435,7 @@ parser.add_argument("--viterbi", dest="viterbi", action="store_true", help="Use 
 parser.add_argument("--loss-margin", default="one", dest="loss_margin", help="Loss margin calculation method in sequence tagger (currently only supported in Viterbi). Supported values - one (default), zero, att-prop (attribute proportional)")
 parser.add_argument("--no-sequence-model", dest="no_sequence_model", action="store_true", help="Use regular LSTM tagger with no viterbi")
 parser.add_argument("--use-char-rnn", dest="use_char_rnn", action="store_true", help="Use character RNN")
+parser.add_argument("--semi-supervised", dest="semi_supervised", action="store_true", help="Add KL-div term")
 parser.add_argument("--log-dir", default="log", dest="log_dir", help="Directory where to write logs / serialized models")
 parser.add_argument("--pos-separate-col", default=True, dest="pos_separate_col", help="Output examples have POS in separate column")
 parser.add_argument("--debug", dest="debug", action="store_true", help="Debug mode")
@@ -564,6 +551,12 @@ else:
                        margins,
                        vocab_size=len(w2i))
 
+embs_shape = model.words_lookup.shape()
+print embs_shape
+if options.semi_supervised:
+    embs_tensor = dy.transpose(dy.concatenate_cols([model.words_lookup[i] for i in xrange(embs_shape[0])]))
+    flattened_embs = dy.inputVector(dy.reshape(embs_tensor, (embs_shape[0] * embs_shape[1], 1)).value())
+    frozen_embs = dy.nobackprop(dy.reshape(flattened_embs, embs_shape))
 
 trainer = dy.MomentumSGDTrainer(model.model, options.learning_rate, 0.9, 0.1)
 logging.info("Training Algorithm: {}".format(type(trainer)))
@@ -609,17 +602,21 @@ for epoch in xrange(int(options.num_epochs)):
                     train_correct[att] += len(tags)
                 train_total[att] += len(tags)
                 losses.append(l)
-            loss_expr = dy.esum(loss_exprs.values()) # TODO or average
+            loss_expr = dy.esum(loss_exprs.values())
         elif options.no_sequence_model:
             gold_tags = instance.tags
             for att in model.attributes:
                 if att not in instance.tags:
                     gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
             loss_exprs = model.loss(instance.sentence, gold_tags)
-            loss_expr = dy.esum(loss_exprs.values()) # TODO or average
+            loss_expr = dy.esum(loss_exprs.values())
         else:
             loss_exprs = model.neg_log_loss(instance.sentence, instance.tags)
-            loss_expr = dy.esum(loss_exprs.values()) # TODO or average
+            loss_expr = dy.esum(loss_exprs.values())
+        if options.semi_supervised:
+            # TODO try and only create embeddings_tensor once
+            embeddings_tensor = dy.transpose(dy.concatenate_cols([ model.words_lookup[i] for i in range(embs_shape[0]) ]))
+            loss_expr = loss_expr + utils.kl_div(embeddings_tensor, frozen_embs)
         loss = loss_expr.scalar_value()
 
         # Bail if loss is NaN
@@ -715,6 +712,8 @@ for epoch in xrange(int(options.num_epochs)):
             logging.info("{} F1: {}".format(attr, f1_eval.mic_f1(att = attr)))
     logging.info("Total attribute F1s: {} micro, {} macro, POS included = {}".format(f1_eval.mic_f1(), f1_eval.mac_f1(), not options.pos_separate_col))
 
+    logging.info("Total dev tokens: {}, Total dev OOV: {}, % OOV: {}".format(dev_total[POS_KEY], dev_oov_total[POS_KEY], dev_oov_total[POS_KEY] / dev_total[POS_KEY]))
+    
     train_loss = train_loss / len(train_instances)
     dev_loss = dev_loss / len(d_instances)
     logging.info("Train Loss: {}".format(train_loss))
@@ -807,3 +806,5 @@ for attr in t2is.keys():
     if attr != POS_KEY:
         logging.info("{} F1: {}".format(attr, f1_eval.mic_f1(att = attr)))
 logging.info("Total attribute F1s: {} micro, {} macro, POS included = {}".format(f1_eval.mic_f1(), f1_eval.mac_f1(), not options.pos_separate_col))
+
+logging.info("Total test tokens: {}, Total test OOV: {}, % OOV: {}".format(test_total[POS_KEY], test_oov_total[POS_KEY], test_oov_total[POS_KEY] / test_total[POS_KEY]))
