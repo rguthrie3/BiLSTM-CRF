@@ -552,8 +552,18 @@ else:
                        margins,
                        vocab_size=len(w2i))
 
-init_embs = list([list(we) for we in model.words_lookup])
-embs_shape = model.words_lookup.shape()
+if options.semi_supervised: # save initial embeddings for KL term
+    arr_look = model.words_lookup.as_array()
+    if options.debug:
+        print "Words lookup is a table of size: {}".format(model.words_lookup.shape())
+        print "Words lookup table as array size: {} with lines of length: {}".format(len(arr_look), len(arr_look[200]))
+    bar = progressbar.ProgressBar()
+    init_embs = []
+    for we in bar(arr_look):
+        init_embs.append(list(we))
+    if options.debug:
+        print "Copied words lookup table size: {}, record size: {}".format(len(init_embs), len(init_embs[300]))
+    embs_shape = model.words_lookup.shape()
 
 trainer = dy.MomentumSGDTrainer(model.model, options.learning_rate, 0.9, 0.1)
 logging.info("Training Algorithm: {}".format(type(trainer)))
@@ -576,7 +586,7 @@ for epoch in xrange(int(options.num_epochs)):
     else:
         train_instances = training_instances
     
-    for instance in bar(train_instances):
+    for idx,instance in enumerate(bar(train_instances)):
         if len(instance.sentence) == 0: continue
 
         # TODO make the interface all the same here
@@ -610,14 +620,16 @@ for epoch in xrange(int(options.num_epochs)):
         else:
             loss_exprs = model.neg_log_loss(instance.sentence, instance.tags)
             loss_expr = dy.esum(loss_exprs.values())
-        if options.semi_supervised:
+        if options.semi_supervised:# and idx > 100:
             # TODO try and only create embeddings_tensor and/or frozen_embs once
-            #frozen_embs = dy.reshape(dy.inputVector(word_embeddings.reshape(1, embs_shape[0] * embs_shape[1])[0]), embs_shape)
-            frozen_embs = dy.nobackprop(dy.transpose(dy.concatenate_cols([ init_embs[i] for i in range(embs_shape[0]) ])))
-            embeddings_tensor = dy.transpose(dy.concatenate_cols([ model.words_lookup[i] for i in range(embs_shape[0]) ]))
-            loss_expr = loss_expr + utils.kl_div(embeddings_tensor, frozen_embs)
+            frozen_embs = dy.nobackprop(dy.transpose(dy.concatenate_cols([ dy.inputVector(init_embs[i]) for i in xrange(embs_shape[0]) ])))
+            embeddings_tensor = dy.transpose(dy.concatenate_cols([ model.words_lookup[i] for i in xrange(embs_shape[0]) ]))
+            if options.debug and idx % 100 == 99:
+                print [all(frozen_embs.value()[i] == embeddings_tensor.value()[i]) for i in range(50,100,5)]
+            kl_div = utils.kl_div(embeddings_tensor, frozen_embs)
+            loss_expr = loss_expr + kl_div
         loss = loss_expr.scalar_value()
-
+        
         # Bail if loss is NaN
         if math.isnan(loss):
             assert False, "NaN occured"
