@@ -621,11 +621,12 @@ for epoch in xrange(int(options.num_epochs)):
             loss_exprs = model.neg_log_loss(instance.sentence, instance.tags)
             loss_expr = dy.esum(loss_exprs.values())
         if options.semi_supervised:# and idx > 100:
-            # TODO try and only create embeddings_tensor and/or frozen_embs once
-            frozen_embs = dy.nobackprop(dy.transpose(dy.concatenate_cols([ dy.inputVector(init_embs[i]) for i in xrange(embs_shape[0]) ])))
-            embeddings_tensor = dy.transpose(dy.concatenate_cols([ model.words_lookup[i] for i in xrange(embs_shape[0]) ]))
+            frozen_embs = dy.nobackprop(dy.transpose(dy.concatenate_cols([ dy.inputVector(init_embs[i]) for i in instance.sentence ])))
+            embeddings_tensor = dy.transpose(dy.concatenate_cols([ model.words_lookup[i] for i in instance.sentence ]))
             if options.debug and idx % 100 == 99:
-                print [all(frozen_embs.value()[i] == embeddings_tensor.value()[i]) for i in range(50,100,5)]
+                all_frozen_embs = dy.nobackprop(dy.transpose(dy.concatenate_cols([ dy.inputVector(init_embs[i]) for i in xrange(embs_shape[0]) ])))
+                all_embeddings_tensor = dy.transpose(dy.concatenate_cols([ model.words_lookup[i] for i in xrange(embs_shape[0]) ]))
+                print [all(all_frozen_embs.value()[i] == all_embeddings_tensor.value()[i]) for i in range(50,100,5)]
             kl_div = utils.kl_div(embeddings_tensor, frozen_embs)
             loss_expr = loss_expr + kl_div
         loss = loss_expr.scalar_value()
