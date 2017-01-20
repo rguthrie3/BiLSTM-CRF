@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--vectors", dest="vectors", help="Pickle file from which to get word vectors")
 parser.add_argument("--vocab", dest="vocab", help="File containing words to output embeddings for")
 parser.add_argument("--morf", dest="morfessor_model", help="Trained morfessor model")
+parser.add_argument("--output", dest="output", default="word_and_morpho_embeds.txt", help="Output location")
 parser.add_argument("--lowercase-backoff", dest="lowercase_backoff", action="store_true", help="Use lowercased segmentation if not available for capitalized word")
 parser.add_argument("--in-vocab-only", dest="in_vocab_only", action="store_true", help="Only output an embedding if it is in-vocab")
 parser.add_argument("--morpho-only", dest="morpho_only", action="store_true", help="Only use the morpheme embeddings")
@@ -60,7 +61,7 @@ if options.morfessor_model is not None:
 np.append(morpho_embeddings, np.zeros((1,morpho_embeddings.shape[1])), axis=0)
 
 
-with codecs.open("word_and_morpho_embeds.txt", "w", "utf-8") as outfile:
+with codecs.open(options.output, "w", "utf-8") as outfile:
     in_vocab = 0
     out_vocab = 0
     total = len(output_words)
