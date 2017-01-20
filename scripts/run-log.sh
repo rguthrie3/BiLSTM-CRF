@@ -51,7 +51,7 @@ python model.py --dataset results/it_mtags-pos.pkl --log-dir log-it-noseq-onlypo
 python model.py --dataset results/da_mtags-pos.pkl --log-dir log-da-noseq-onlypos-randinit-char --no-sequence-model --use-char-rnn --num-epochs 20;
 python model.py --dataset results/it_mtags-dd.pkl --log-dir log-it-noseq-randinit-char --no-sequence-model --use-char-rnn --num-epochs 20;
 python model.py --dataset results/da_mtags-dd.pkl --log-dir log-da-noseq-randinit-char --no-sequence-model --use-char-rnn --num-epochs 20;
-# CELEX initialization (1/4):
+# CELEX initialization (1/4, then 1/18 again):
 python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_celex_vectors_varembed_ud.txt --log-dir log-onlypos-noseq-celinit-char-05dr --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
 python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_celex_vectors_varembed_ud.txt --log-dir log-noseq-celinit-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
 python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_celex_vectors_varembed_ud.txt --log-dir log-noseq-celinit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
@@ -123,3 +123,14 @@ python model.py --dataset results/en_mtags-pos.pkl --log-dir log-onlypos-noseq-s
 python model.py --dataset results/en_mtags-pos.pkl --log-dir log-onlypos-noseq-semisup-randinit-char-05dr-sumtags --dropout 0.5 --no-sequence-model --use-char-rnn --semi-supervised --dynet-mem 250 --num-epochs 40;
 python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-onlypos-noseq-semisup-varinit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --semi-supervised --dynet-mem 250 --num-epochs 40;
 python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-onlypos-noseq-semisup-varinit-char-05dr-sumtags --dropout 0.5 --no-sequence-model --semi-supervised --dynet-mem 250 --use-char-rnn --num-epochs 40;
+# More for re-running CELEX (1/18 - see 1/4 and 1/5 for more celinit)
+python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_celex_vectors_varembed_ud-nolc.txt --log-dir log-onlypos-noseq-celinit-nolc-nochar-05dr --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_celex_vectors_varembed_ud-morf.txt --log-dir log-onlypos-noseq-celinit-morf-nochar-05dr --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_celex_vectors_varembed_ud-morf.txt --log-dir log-onlypos-noseq-celinit-morf-char-05dr --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_celex_vectors_varembed_ud-morf.txt --log-dir log-noseq-celinit-morf-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_celex_vectors_varembed_ud-morf.txt --log-dir log-noseq-celinit-morf-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+# Canonical (Jan 20)
+python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_canonical_vectors_varembed_ud-morf.txt --log-dir log-onlypos-noseq-caninit-morf-nochar-05dr --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_canonical_vectors_varembed_ud-morf.txt --log-dir log-onlypos-noseq-caninit-morf-char-05dr --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_canonical_vectors_varembed_ud-morf.txt --log-dir log-noseq-caninit-morf-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_canonical_vectors_varembed_ud-morf.txt --log-dir log-noseq-caninit-morf-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
