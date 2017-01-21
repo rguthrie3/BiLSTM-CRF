@@ -27,7 +27,7 @@ PADDING_CHAR = "<*>"
 
 class BiLSTM_CRF:
 
-    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, morpheme_embeddings, morpheme_projection, morpheme_decomps, use_char_rnn, charset_size, train_vocab_ctr, margins, vocab_size=None):
+    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, use_char_rnn, charset_size, train_vocab_ctr, margins, vocab_size=None):
         self.model = dy.Model()
         self.tagset_sizes = tagset_sizes
         self.train_vocab_ctr = train_vocab_ctr
@@ -82,27 +82,7 @@ class BiLSTM_CRF:
 
 
     def word_rep(self, word):
-        """
-        For rare words in the training data, we will use their morphemes
-        to make their representation
-        """ 
-        if self.train_vocab_ctr[word] > 5 or self.morpheme_lookup is None:
-            wemb = self.words_lookup[word]
-        else:
-            # Use morpheme embeddings
-            morpheme_decomp = self.morpheme_decomps[word]
-            wemb = self.morpheme_lookup[morpheme_decomp[0]]
-            for m in morpheme_decomp[1:]:
-                wemb += self.morpheme_lookup[m]
-            if self.morpheme_projection is not None:
-                wemb = self.morpheme_projection * wemb
-            if np.linalg.norm(wemb.npvalue()) >= 50.0:
-                # This is meant to handle things like URLs and weird tokens like !!!!!!!!!!!!!!!!!!!!!
-                # that are splitting into a lot of morphemes, and their large representations are cause NaNs
-                # TODO handle this in a better way.  Looks like all such inputs are either URLs, email addresses, or
-                # long strings of a punctuation token when the decomposition is > 10
-                wemb = self.words_lookup[w2i["<UNK>"]]
-        
+        wemb = self.words_lookup[word]
         if self.use_char_rnn:
             pad_char = c2i[PADDING_CHAR]
             char_ids = [pad_char] + [c2i[c] for c in i2w[word]] + [pad_char] # TODO optimize
@@ -263,9 +243,6 @@ class BiLSTM_CRF:
         
         with open(file_name + "-atts", 'w') as attdict:
             attdict.write("\t".join(sorted(self.attributes)))
-        
-        # TODO save morpheme stuff in non-model location (like self.attributes)
-        # TODO also for tagset_sizes, train_vocab_ctr, margins?
     
     @property
     def model(self):
@@ -398,9 +375,6 @@ class LSTMTagger:
         
         with open(file_name + "-atts", 'w') as attdict:
             attdict.write("\t".join(sorted(self.attributes)))
-        
-        # TODO save morpheme stuff in non-model location (like self.attributes)
-        # TODO also for tagset_sizes, train_vocab_ctr, margins?
 
     @property
     def model(self):
@@ -424,8 +398,6 @@ def get_att_prop(instances):
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset", required=True, dest="dataset", help=".pkl file to use")
 parser.add_argument("--word-embeddings", dest="word_embeddings", help="File from which to read in pretrained embeds")
-parser.add_argument("--morpheme-embeddings", dest="morpheme_embeddings", help="File from which to read in pretrained embeds")
-parser.add_argument("--morpheme-projection", dest="morpheme_projection", help="Pickle file containing projection matrix if applicable")
 parser.add_argument("--num-epochs", default=20, dest="num_epochs", type=int, help="Number of full passes through training set")
 parser.add_argument("--lstm-layers", default=2, dest="lstm_layers", type=int, help="Number of LSTM layers")
 parser.add_argument("--hidden-dim", default=128, dest="hidden_dim", type=int, help="Size of LSTM hidden layers")
@@ -520,17 +492,6 @@ if options.no_sequence_model:
                        word_embedding_dim=128)
 
 else:
-    #morpheme_embeddings = utils.read_pretrained_embeddings(options.morpheme_embeddings, m2i)
-    # if options.morpheme_projection is not None:
-    #     assert word_embeddings.shape[1] != morpheme_embeddings.shape[1]
-    #     morpheme_projection = cPickle.load(open(options.morpheme_projection, "r"))
-    # else:
-    #     morpheme_projection = None
-
-    morpheme_embeddings = None
-    morpheme_projection = None
-    morpheme_decomps = None
-    #morpheme_decomps = dataset["morpheme_segmentations"]
     if not options.viterbi:
         margins = None
     elif options.loss_margin == "one":
@@ -543,9 +504,6 @@ else:
                        options.lstm_layers,
                        options.hidden_dim,
                        word_embeddings,
-                       morpheme_embeddings,
-                       morpheme_projection,
-                       morpheme_decomps,
                        options.use_char_rnn,
                        len(c2i),
                        training_vocab,
