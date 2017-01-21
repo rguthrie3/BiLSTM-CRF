@@ -122,34 +122,6 @@ def read_file(filename, w2i, t2is, c2i):
                         mtags.append(t2is[k][v])
     return instances, vocab_counter
 
-# def read_file(filename, w2i, t2i):
-#     instances = []
-#     vocab_counter = collections.Counter()
-#     with codecs.open(filename, "r", "utf-8") as f:
-#         sentence = []
-#         tags = []
-#         for i, line in enumerate(f):
-#             if line == "=====\n":
-#                 # Reached the end of a sentence
-#                 instances.append(Instance(sentence, tags))
-#                 sentence = []
-#                 tags = []
-#             else:
-#                 data = line.split("/")
-#                 if len(data) > 2:
-#                     word = '/'.join(data[:-2])
-#                 else:
-#                     word = data[0]
-#                 tag = data[-1]
-#                 vocab_counter[word] += 1
-#                 if word not in w2i:
-#                     w2i[word] = len(w2i)
-#                 if tag not in t2i:
-#                     t2i[tag] = len(t2i)
-#                 sentence.append(w2i[word])
-#                 tags.append(t2i[tag])
-#     return instances, vocab_counter
-
 parser = argparse.ArgumentParser()
 parser.add_argument("--training-data", required=True, dest="training_data", help="Training data .txt file")
 parser.add_argument("--dev-data", required=True, dest="dev_data", help="Development data .txt file")
