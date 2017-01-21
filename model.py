@@ -27,11 +27,12 @@ PADDING_CHAR = "<*>"
 
 class BiLSTM_CRF:
 
-    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, use_char_rnn, charset_size, train_vocab_ctr, margins, vocab_size=None):
+    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, use_char_rnn, charset_size, train_vocab_ctr, margins, lowercase_words, vocab_size=None):
         self.model = dy.Model()
         self.tagset_sizes = tagset_sizes
         self.train_vocab_ctr = train_vocab_ctr
         self.margins = margins
+        self.lowercase_words = lowercase_words
 
         # Word embedding parameters
         if word_embeddings is not None: # Use pretrained embeddings
@@ -82,9 +83,21 @@ class BiLSTM_CRF:
 
 
     def word_rep(self, word):
-        wemb = self.words_lookup[word]
+        '''
+        :param word: index of word in lookup table
+        '''
+        if self.lowercase_words:
+            lower_word_form = i2w[word].lower()
+            if lower_word_form in w2i:
+                word_in_ds = w2i[lower_word_form]
+            else:
+                word_in_ds = word
+        else:
+            word_in_ds = word
+        wemb = self.words_lookup[word_in_ds]
         if self.use_char_rnn:
             pad_char = c2i[PADDING_CHAR]
+            # Note: use original casing ("word") for characters
             char_ids = [pad_char] + [c2i[c] for c in i2w[word]] + [pad_char] # TODO optimize
             char_embs = [self.char_lookup[cid] for cid in char_ids]
             char_exprs = self.char_bi_lstm.transduce(char_embs)
@@ -251,11 +264,12 @@ class BiLSTM_CRF:
 
 class LSTMTagger:
 
-    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, train_vocab_ctr, use_char_rnn, charset_size, vocab_size=None, word_embedding_dim=None):
+    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, train_vocab_ctr, use_char_rnn, charset_size, lowercase_words, vocab_size=None, word_embedding_dim=None):
         self.model = dy.Model()
         self.tagset_sizes = tagset_sizes
         self.train_vocab_ctr = train_vocab_ctr
         self.attributes = tagset_sizes.keys()
+        self.lowercase_words = lowercase_words
         
         if word_embeddings is not None: # Use pretrained embeddings
             vocab_size = word_embeddings.shape[0]
@@ -290,11 +304,23 @@ class LSTMTagger:
             self.mlp_out_bias[att] = self.model.add_parameters(set_size)
 
 
-    def word_rep(self, w):
-        wemb = self.words_lookup[w]
+    def word_rep(self, word):
+        '''
+        :param word: index of word in lookup table
+        '''
+        if self.lowercase_words:
+            lower_word_form = i2w[word].lower()
+            if lower_word_form in w2i:
+                word_in_ds = w2i[lower_word_form]
+            else:
+                word_in_ds = word
+        else:
+            word_in_ds = word
+        wemb = self.words_lookup[word_in_ds]
         if self.use_char_rnn:
             pad_char = c2i[PADDING_CHAR]
-            char_ids = [pad_char] + [c2i[c] for c in i2w[w]] + [pad_char] # TODO optimize
+            # Note: use original casing ("word") for characters
+            char_ids = [pad_char] + [c2i[c] for c in i2w[word]] + [pad_char] # TODO optimize
             char_embs = [self.char_lookup[cid] for cid in char_ids]
             char_exprs = self.char_bi_lstm.transduce(char_embs)
             return dy.concatenate([ wemb, char_exprs[-1] ])
@@ -407,6 +433,7 @@ parser.add_argument("--viterbi", dest="viterbi", action="store_true", help="Use 
 parser.add_argument("--loss-margin", default="one", dest="loss_margin", help="Loss margin calculation method in sequence tagger (currently only supported in Viterbi). Supported values - one (default), zero, att-prop (attribute proportional)")
 parser.add_argument("--no-sequence-model", dest="no_sequence_model", action="store_true", help="Use regular LSTM tagger with no viterbi")
 parser.add_argument("--use-char-rnn", dest="use_char_rnn", action="store_true", help="Use character RNN")
+parser.add_argument("--lowercase-words", dest="lowercase_words", action="store_true", help="Words are all in lowercased form (characters stay the same)")
 parser.add_argument("--semi-supervised", dest="semi_supervised", action="store_true", help="Add KL-div term")
 parser.add_argument("--log-dir", default="log", dest="log_dir", help="Directory where to write logs / serialized models")
 parser.add_argument("--pos-separate-col", default=True, dest="pos_separate_col", help="Output examples have POS in separate column")
@@ -443,9 +470,10 @@ Initial Learning Rate: {}
 Dropout: {}
 Objective: {}
 Viterbi margin scheme: {}
+Lowercasing words: {}
 
 """.format(options.dataset, options.word_embeddings, options.num_epochs, options.lstm_layers, options.hidden_dim,
-           options.learning_rate, options.dropout, objective, options.loss_margin))
+           options.learning_rate, options.dropout, objective, options.loss_margin, options.lowercase_words))
 
 if options.debug:
     print "DEBUG MODE"
@@ -488,6 +516,7 @@ if options.no_sequence_model:
                        train_vocab_ctr=training_vocab,
                        use_char_rnn=options.use_char_rnn,
                        charset_size=len(c2i),
+                       lowercase_words=options.lowercase_words,
                        vocab_size=len(w2i),
                        word_embedding_dim=128)
 
@@ -508,6 +537,7 @@ else:
                        len(c2i),
                        training_vocab,
                        margins,
+                       options.lowercase_words,
                        vocab_size=len(w2i))
 
 if options.semi_supervised: # save initial embeddings for KL term
