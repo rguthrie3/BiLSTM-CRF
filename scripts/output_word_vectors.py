@@ -33,7 +33,7 @@ with codecs.open(options.vocab, "r", "utf-8") as f:
 if options.polyglot:
     words, embs = cPickle.load(open(options.vectors, "r"))
     word_to_ix = {w : i for (i,w) in enumerate(words)}
-    with codecs.open("word_and_morpho_embeds.txt", "w", "utf-8") as outfile:
+    with codecs.open(options.output, "w", "utf-8") as outfile:
         in_vocab = 0
         total = len(output_words)
         for orig_word in output_words:
