@@ -156,3 +156,8 @@ python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/e
 python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_wiki_vectors_varembed-64d_ud.txt --log-dir log-onlypos-noseq-var64init-char-05dr --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
 python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_wiki_vectors_varembed-64d_ud.txt --log-dir log-noseq-var64init-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
 python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_wiki_vectors_varembed-64d_ud.txt --log-dir log-noseq-var64init-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+# Lowercased words (Jan 21)
+python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-onlypos-noseq-varinit-lcw-nochar-05dr --dropout 0.5 --no-sequence-model --lowercase-words --num-epochs 40;
+python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-onlypos-noseq-varinit-lcw-char-05dr --dropout 0.5 --use-char-rnn --no-sequence-model --lowercase-words --num-epochs 40;
+python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-noseq-varinit-lcw-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --lowercase-words --num-epochs 40;
+python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-noseq-varinit-lcw-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --lowercase-words --num-epochs 40;
