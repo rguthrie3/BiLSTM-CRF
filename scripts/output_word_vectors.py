@@ -5,6 +5,8 @@ import morfessor
 import codecs
 import numpy as np
 
+POLYGLOT_UNK = unicode("<UNK>")
+
 def output_word_vector(word, embed, outfile):
     outfile.write(word + " ")
     for i in embed:
@@ -43,6 +45,9 @@ if options.polyglot:
                 embed = embs[word_to_ix[word]]
                 output_word_vector(orig_word, embed, outfile)
                 in_vocab += 1
+            else:
+                embed = embs[word_to_ix[POLYGLOT_UNK]]
+                output_word_vector(orig_word, embed, outfile)
         print "Total Number of output words:", total
         print "Total in Training Vocabulary:", in_vocab
         print "Percentage in-vocab:", in_vocab / total
