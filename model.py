@@ -264,12 +264,16 @@ class BiLSTM_CRF:
 
 class LSTMTagger:
 
-    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, train_vocab_ctr, use_char_rnn, charset_size, lowercase_words, vocab_size=None, word_embedding_dim=None):
+    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, train_vocab_ctr, use_char_rnn, charset_size, lowercase_words, att_props=None, vocab_size=None, word_embedding_dim=None):
         self.model = dy.Model()
         self.tagset_sizes = tagset_sizes
         self.train_vocab_ctr = train_vocab_ctr
         self.attributes = tagset_sizes.keys()
         self.lowercase_words = lowercase_words
+        if att_props is not None:
+            self.att_props = {att:(1.0-p) for att,p in att_props.iteritems()}
+        else:
+            self.att_props = None
         
         if word_embeddings is not None: # Use pretrained embeddings
             vocab_size = word_embeddings.shape[0]
@@ -356,19 +360,23 @@ class LSTMTagger:
     def loss(self, sentence, tags_set):
         observations_set = self.build_tagging_graph(sentence)
         errors = {}
-        for att, tags in tags_set.items():
+        for att, tags in tags_set.iteritems():
             err = []
             for obs, tag in zip(observations_set[att], tags):
                 err_t = dy.pickneglogsoftmax(obs, tag)
                 err.append(err_t)
             errors[att] = dy.esum(err)
+        if self.att_props is not None:
+            for att, err in errors.iteritems():
+                prop_vec = dy.inputVector([self.att_props[att]] * err.dim()[0])
+                err = dy.cmult(err, prop_vec)
         return errors
 
 
     def tag_sentence(self, sentence):
         observations_set = self.build_tagging_graph(sentence)
         tag_seqs = {}
-        for att, observations in observations_set.items():
+        for att, observations in observations_set.iteritems():
             observations = [ dy.softmax(obs) for obs in observations ]
             probs = [ obs.npvalue() for obs in observations ]
             tag_seq = []
@@ -408,7 +416,7 @@ class LSTMTagger:
 
 
 def get_att_prop(instances):
-    logging.info("Calculating attribute proportions for proportional loss margin")
+    logging.info("Calculating attribute proportions for proportional loss margin or proportional loss magnitude")
     total_tokens = 0
     att_counts = Counter()
     for instance in instances:
@@ -432,6 +440,7 @@ parser.add_argument("--dropout", default=-1, dest="dropout", type=float, help="A
 parser.add_argument("--viterbi", dest="viterbi", action="store_true", help="Use viterbi training instead of CRF")
 parser.add_argument("--loss-margin", default="one", dest="loss_margin", help="Loss margin calculation method in sequence tagger (currently only supported in Viterbi). Supported values - one (default), zero, att-prop (attribute proportional)")
 parser.add_argument("--no-sequence-model", dest="no_sequence_model", action="store_true", help="Use regular LSTM tagger with no viterbi")
+parser.add_argument("--loss-prop", dest="loss_prop", action="store_true", help="Proportional loss magnitudes in LSTM model")
 parser.add_argument("--use-char-rnn", dest="use_char_rnn", action="store_true", help="Use character RNN")
 parser.add_argument("--lowercase-words", dest="lowercase_words", action="store_true", help="Words are all in lowercased form (characters stay the same)")
 parser.add_argument("--semi-supervised", dest="semi_supervised", action="store_true", help="Add KL-div term")
@@ -460,6 +469,12 @@ elif options.no_sequence_model:
     objective = "No Sequence Model"
 else:
     objective = "CRF"
+if options.viterbi:
+    loss_scheme = "Viterbi margin scheme: {}".format(options.loss_margin)
+elif options.no_sequence_model:
+    loss_scheme = "LSTM loss weights proportional to attribute frequency: {}".format(options.loss_prop)
+else:
+    loss_scheme = "No loss variables in this objective"
 logging.info(
 """
 Dataset: {}
@@ -469,11 +484,11 @@ LSTM: {} layers, {} hidden dim
 Initial Learning Rate: {}
 Dropout: {}
 Objective: {}
-Viterbi margin scheme: {}
+{}
 Lowercasing words: {}
 
 """.format(options.dataset, options.word_embeddings, options.num_epochs, options.lstm_layers, options.hidden_dim,
-           options.learning_rate, options.dropout, objective, options.loss_margin, options.lowercase_words))
+           options.learning_rate, options.dropout, objective, loss_scheme, options.lowercase_words))
 
 if options.debug:
     print "DEBUG MODE"
@@ -509,6 +524,10 @@ else:
 
 tag_set_sizes = { att: len(t2i) for att, t2i in t2is.items() }
 if options.no_sequence_model:
+    if options.loss_prop:
+        att_props = get_att_prop(training_instances)
+    else:
+        att_props = None
     model = LSTMTagger(tagset_sizes=tag_set_sizes,
                        num_lstm_layers=options.lstm_layers,
                        hidden_dim=options.hidden_dim,
@@ -518,6 +537,7 @@ if options.no_sequence_model:
                        charset_size=len(c2i),
                        lowercase_words=options.lowercase_words,
                        vocab_size=len(w2i),
+                       att_props=att_props,
                        word_embedding_dim=128)
 
 else:
