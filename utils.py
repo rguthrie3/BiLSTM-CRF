@@ -71,8 +71,6 @@ def kl_div(x, y):
     ones = dy.reshape(dy.inputVector([1] * matrix_size), shape)
     total = dy.cmult(sig_x, dy.log(ones + exp_neg_y) - dy.log(ones + exp_neg_x)) + dy.cmult(ones - sig_x, dy.log(ones + exp_y) - dy.log(ones +exp_x))
     # now we average in a convoluted way
-    #total_cols = dy.reshape(total, (1, matrix_size))
-    #sum = dy.sum_cols(total_cols)
     sum = dy.sum_cols(dy.transpose(dy.sum_cols(total)))
     return dy.cdiv(sum, dy.inputVector([matrix_size]))
 

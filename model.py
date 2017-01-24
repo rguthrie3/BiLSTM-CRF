@@ -444,6 +444,7 @@ parser.add_argument("--loss-prop", dest="loss_prop", action="store_true", help="
 parser.add_argument("--use-char-rnn", dest="use_char_rnn", action="store_true", help="Use character RNN")
 parser.add_argument("--lowercase-words", dest="lowercase_words", action="store_true", help="Words are all in lowercased form (characters stay the same)")
 parser.add_argument("--semi-supervised", dest="semi_supervised", action="store_true", help="Add KL-div term")
+parser.add_argument("--kl-weight", default=1000, dest="kl_weight", type=float, help="Weight of KL-divergence term")
 parser.add_argument("--log-dir", default="log", dest="log_dir", help="Directory where to write logs / serialized models")
 parser.add_argument("--pos-separate-col", default=True, dest="pos_separate_col", help="Output examples have POS in separate column")
 parser.add_argument("--dynet-mem", help="Ignore this outside argument")
@@ -500,7 +501,6 @@ dataset = cPickle.load(open(options.dataset, "r"))
 w2i = dataset["w2i"]
 t2is = dataset["t2is"]
 c2i = dataset["c2i"]
-#m2i = dataset["m2i"]
 m2i = None
 i2w = { i: w for w, i in w2i.items() } # Inverse mapping
 i2ts = { att: {i: t for t, i in t2i.items()} for att, t2i in t2is.items() }
@@ -629,13 +629,17 @@ for epoch in xrange(int(options.num_epochs)):
             loss_exprs = model.neg_log_loss(instance.sentence, instance.tags)
             loss_expr = dy.esum(loss_exprs.values())
         if options.semi_supervised:# and idx > 100:
-            frozen_embs = dy.nobackprop(dy.transpose(dy.concatenate_cols([ dy.inputVector(init_embs[i]) for i in instance.sentence ])))
+            #frozen_embs = dy.nobackprop(dy.transpose(dy.concatenate_cols([ dy.inputVector(init_embs[i]) for i in instance.sentence ])))
+            frozen_embs = dy.transpose(dy.concatenate_cols([ dy.inputVector(init_embs[i]) for i in instance.sentence ]))
             embeddings_tensor = dy.transpose(dy.concatenate_cols([ model.words_lookup[i] for i in instance.sentence ]))
-            if options.debug and idx % 100 == 99:
+            if options.debug and idx % 1000 == 999:
                 all_frozen_embs = dy.nobackprop(dy.transpose(dy.concatenate_cols([ dy.inputVector(init_embs[i]) for i in xrange(embs_shape[0]) ])))
                 all_embeddings_tensor = dy.transpose(dy.concatenate_cols([ model.words_lookup[i] for i in xrange(embs_shape[0]) ]))
                 print [all(all_frozen_embs.value()[i] == all_embeddings_tensor.value()[i]) for i in range(50,100,5)]
-            kl_div = utils.kl_div(embeddings_tensor, frozen_embs)
+            kl_weight_expr = dy.inputVector([options.kl_weight])
+            kl_div = dy.cmult(utils.kl_div(embeddings_tensor, frozen_embs), kl_weight_expr)
+            if options.debug:
+                print "KL Div {} added to loss {}".format(kl_div.value(), loss_expr.value())
             loss_expr = loss_expr + kl_div
         loss = loss_expr.scalar_value()
         
@@ -741,18 +745,19 @@ for epoch in xrange(int(options.num_epochs)):
     train_dev_cost.add_column([train_loss, dev_loss])
     
     # Serialize model
-    new_model_file_name = "{}/model_epoch-{:02d}.bin".format(options.log_dir, epoch + 1)
-    logging.info("Saving model to {}".format(new_model_file_name))
-    model.save(new_model_file_name) # TODO also save non-internal model stuff like mappings
-    if epoch > 1 and epoch % 10 != 0: # leave models from epochs 1,10,20, etc.
-        logging.info("Removing files from previous epoch.")
-        old_model_file_name = "{}/model_epoch-{:02d}.bin".format(options.log_dir, epoch)
-        os.remove(old_model_file_name)
-        os.remove(old_model_file_name + ".pym")
-        os.remove(old_model_file_name + ".pyk")
-        os.remove(old_model_file_name + "-atts")
-        old_devout_file_name = "{}/devout_epoch-{:02d}.txt".format(options.log_dir, epoch)
-        os.remove(old_devout_file_name)
+    if not options.debug:
+        new_model_file_name = "{}/model_epoch-{:02d}.bin".format(options.log_dir, epoch + 1)
+        logging.info("Saving model to {}".format(new_model_file_name))
+        model.save(new_model_file_name) # TODO also save non-internal model stuff like mappings
+        if epoch > 1 and epoch % 10 != 0: # leave models from epochs 1,10,20, etc.
+            logging.info("Removing files from previous epoch.")
+            old_model_file_name = "{}/model_epoch-{:02d}.bin".format(options.log_dir, epoch)
+            os.remove(old_model_file_name)
+            os.remove(old_model_file_name + ".pym")
+            os.remove(old_model_file_name + ".pyk")
+            os.remove(old_model_file_name + "-atts")
+            old_devout_file_name = "{}/devout_epoch-{:02d}.txt".format(options.log_dir, epoch)
+            os.remove(old_devout_file_name)
 
 
 
