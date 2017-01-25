@@ -73,6 +73,9 @@ class BiLSTM_CRF:
 
     def word_rep(self, word):
         return self.words_lookup[word]
+        
+    def size(self):
+        return self.words_lookup.shape()[0]
 
     @property
     def model(self):
@@ -108,14 +111,18 @@ class LSTMTagger:
 
     def word_rep(self, w):
         return self.words_lookup[w]
+        
+    def size(self):
+        return self.words_lookup.shape()[0]
 
 # ===-----------------------------------------------------------------------===
 # Argument parsing
 # ===-----------------------------------------------------------------------===
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset", required=True, dest="dataset", help=".pkl file to use")
-parser.add_argument("--embs-dict", required=True, dest="embs_dict", help="Original embeddings dictionary")
+parser.add_argument("--embs-dict", dest="embs_dict", default=None, help="Original embeddings dictionary")
 parser.add_argument("--model", required=True, dest="model_file", help="Model file to use (.bin)")
+parser.add_argument("--model2", required=True, dest="model_file2", help="2nd model file to use (.bin)")
 parser.add_argument("--viterbi", dest="viterbi", action="store_true", help="Use viterbi training instead of CRF")
 parser.add_argument("--no-sequence-model", dest="no_sequence_model", action="store_true", help="Use regular LSTM tagger with no viterbi")
 parser.add_argument("--pos-separate-col", default=True, dest="pos_separate_col", help="Output examples have POS in separate column")
@@ -144,9 +151,10 @@ logging.info(
 Dataset: {}
 Original embeddings: {}
 Model input: {}
+2nd model input: {}
 Objective: {}
 
-""".format(options.dataset, options.embs_dict, options.model_file, objective))
+""".format(options.dataset, options.embs_dict, options.model_file, options.model_file2, objective))
 
 if options.debug:
     print "DEBUG MODE"
@@ -167,19 +175,30 @@ if options.no_sequence_model:
 else:
     model = BiLSTM_CRF(options.model_file, options.use_char_rnn)
 
-word_embeddings = utils.read_pretrained_embeddings(options.embs_dict, w2i)
-total_words = len(word_embeddings)
-print "Found {} word embeddings ".format(total_words)
+if options.embs_dict is not None:
+    word_embeddings = utils.read_pretrained_embeddings(options.embs_dict, w2i)
+    total_words = len(word_embeddings)
+    print "Found {} word embeddings ".format(total_words)
+else:
+    if options.no_sequence_model:
+        model2 = LSTMTagger(options.model_file, options.use_char_rnn)
+    else:
+        model2 = BiLSTM_CRF(options.model_file, options.use_char_rnn)
+    total_words = model2.size()
+    print "Found {} word embeddings ".format(total_words)
 
 unfound_words = 0
 total_same = 0
 total_diff = 0.0
 for word in xrange(total_words):
-	diff = np.linalg.norm(word_embeddings[word] - model.word_rep(word).npvalue())
-	if diff > 0.0:
-		total_diff += diff
-	else:
-		total_same += 1
+    if options.embs_dict is not None:
+        diff = np.linalg.norm(word_embeddings[word] - model.word_rep(word).npvalue())
+    else:
+        diff = np.linalg.norm(model2.word_rep(word).npvalue() - model.word_rep(word).npvalue())
+    if diff > 0.0:
+        total_diff += diff
+    else:
+        total_same += 1
 
 logging.info("Unchanged words: {} of {} = {}".format(total_same, total_words, total_same / total_words))
 logging.info("Total diff: {}".format(diff))
