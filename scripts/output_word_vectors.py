@@ -38,7 +38,7 @@ if options.polyglot:
         total = len(output_words)
         for orig_word in output_words:
             if orig_word not in words and options.lowercase_backoff:
-                word = word.lower()
+                word = orig_word.lower()
             else:
                 word = orig_word
             if word in words:
@@ -94,7 +94,7 @@ with codecs.open(options.output, "w", "utf-8") as outfile:
     else:
         for orig_word in output_words:
             if orig_word not in word_to_ix and options.lowercase_backoff:
-                word = word.lower()
+                word = orig_word.lower()
             else:
                 word = orig_word
             if word in word_to_ix:
@@ -107,7 +107,7 @@ with codecs.open(options.output, "w", "utf-8") as outfile:
             elif not options.in_vocab_only:
                 embed = np.array([ morpho_embeddings[morpho_to_ix.get(m, -1)] for m in morfessor_model.viterbi_segment(word)[0] ]).sum(axis=0)
                 output_word_vector(orig_word, embed, outfile)
-                out_vocab += 1	
+                out_vocab += 1
         print "Total Number of wordvectors.org words:", total
         print "Total in Training Vocabulary:", in_vocab
         print "Total out of Training Vocabulary", out_vocab
