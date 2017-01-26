@@ -50,13 +50,13 @@ for inst in train:
             if att != "POS" and vals[i] != 0: # TODO change to var via t2is.inverse()
                 pos_atts[pos].add(att)
 
-print pos_atts
+if options.debug: print pos_atts
 
 # init F1 calculators
-curr_eval = Evaluator()
-dict_removed_eval = Evaluator()
-oracle_eval = Evaluator()
-posonly_eval = Evaluator()
+curr_eval = Evaluator(m = 'att')
+dict_removed_eval = Evaluator(m = 'att')
+oracle_eval = Evaluator(m = 'att')
+posonly_eval = Evaluator(m = 'att')
 
 # load dev files
 # calculate micro F1 for:
@@ -75,29 +75,29 @@ with open(options.results, "r", encoding="utf-8") as dev_results:
             if len(res_cols) < 4: continue
             pos_res_cols = pos_res.split("\t")
             assert res_cols[0:1] == pos_res_cols[0:1]
+            
+            gold_pos = res_cols[1]
+            obs_pos = res_cols[3]
+            posonly_pos = pos_res_cols[3]
+            
             gold = split_tagstring(res_cols[2])
             curr_obs = split_tagstring(res_cols[4])
-            dict_removed_obs = {}
-            posonly_obs = {}
-            oracle_obs = {}
-            dict_allow_atts = pos_atts[res_cols[3]]
-            posonly_atts = pos_atts[pos_res_cols[3]]
-            oracle_atts = pos_atts[res_cols[1]]
-            if res_cols[1] == res_cols[3]:
-                joint_good += 1
-            if res_cols[1] == pos_res_cols[3]:
-                posonly_good += 1
-            # populate obs-s (TODO: list-compify)
-            for att,val in curr_obs.iteritems():
-                if att in dict_allow_atts:
-                    dict_removed_obs[att] = val
-                if att in posonly_atts:
-                    posonly_obs[att] = val
-                if att in oracle_atts:
-                    oracle_obs[att] = val
-            for a,v in gold.iteritems():
-                if a not in oracle_atts:
-                    dev_pairs_not_in_train += 1
+            
+            dict_allow_atts = pos_atts[obs_pos]
+            posonly_atts = pos_atts[posonly_pos]
+            oracle_atts = pos_atts[gold_pos]
+            if gold_pos == obs_pos:
+                joint_good += 1 # validate log result
+            if gold_pos == posonly_pos:
+                posonly_good += 1 # validate log result
+            
+            dict_removed_obs = {att:val for att, val in curr_obs.iteritems() if att in dict_allow_atts}
+            posonly_obs = {att:val for att, val in curr_obs.iteritems() if att in posonly_atts}
+            oracle_obs = {att:val for att, val in curr_obs.iteritems() if att in oracle_atts}
+            
+            unseen = [a for a in gold if a not in oracle_atts]
+            if len(unseen) > 0 and options.debug: print "Unseen", gold_pos, unseen
+            dev_pairs_not_in_train += len(unseen)
             
             # add to evaluators
             curr_eval.add_instance(gold, curr_obs)
@@ -106,11 +106,12 @@ with open(options.results, "r", encoding="utf-8") as dev_results:
             posonly_eval.add_instance(gold, posonly_obs)
             valid += 1
 
-print valid
-print curr_eval.mic_f1()
-print dict_removed_eval.mic_f1()
-print oracle_eval.mic_f1()
-print posonly_eval.mic_f1()
-print dev_pairs_not_in_train
-print joint_good / valid
-print posonly_good / valid
+if options.debug: print "Tokens:", valid
+
+print "\n", "Joint POS acc (validation):", joint_good / valid
+print "POS-only acc (validation):", posonly_good / valid, "\n"
+print "Joint F1 (validation):", curr_eval.mic_f1()
+print "Post-processed F1:", dict_removed_eval.mic_f1()
+print "POS-only processed F1:", posonly_eval.mic_f1()
+print "Oracle F1:", oracle_eval.mic_f1()
+print "Dev POS-att pairs not in training set:", dev_pairs_not_in_train
