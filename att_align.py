@@ -47,7 +47,7 @@ for inst in train:
     for i in xrange(len(inst.sentence)):
         pos = i2ts["POS"][inst.tags["POS"][i]]
         for att,vals in inst.tags.iteritems():
-            if att != "POS" and vals[i] != 0: # TODO change to var via t2is.inverse()
+            if att != "POS" and vals[i] != t2is[att][NONE_TAG]:
                 pos_atts[pos].add(att)
 
 if options.debug: print pos_atts
