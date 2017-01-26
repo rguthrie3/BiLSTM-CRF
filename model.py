@@ -24,6 +24,7 @@ END_TAG = "<STOP>"
 POS_KEY = "POS"
 PADDING_CHAR = "<*>"
 
+DEFAULT_WORD_EMBEDDING_SIZE = 64
 
 class BiLSTM_CRF:
 
@@ -41,7 +42,7 @@ class BiLSTM_CRF:
             self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
             self.words_lookup.init_from_array(word_embeddings)
         else:
-            word_embedding_dim = 128
+            word_embedding_dim = DEFAULT_WORD_EMBEDDING_SIZE
             self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
         
         # Char LSTM Parameters
@@ -538,7 +539,7 @@ if options.no_sequence_model:
                        lowercase_words=options.lowercase_words,
                        vocab_size=len(w2i),
                        att_props=att_props,
-                       word_embedding_dim=128)
+                       word_embedding_dim=DEFAULT_WORD_EMBEDDING_SIZE)
 
 else:
     if not options.viterbi:
