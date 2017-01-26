@@ -629,18 +629,19 @@ for epoch in xrange(int(options.num_epochs)):
             loss_exprs = model.neg_log_loss(instance.sentence, instance.tags)
             loss_expr = dy.esum(loss_exprs.values())
         if options.semi_supervised:# and idx > 100:
-            #frozen_embs = dy.nobackprop(dy.transpose(dy.concatenate_cols([ dy.inputVector(init_embs[i]) for i in instance.sentence ])))
-            frozen_embs = dy.transpose(dy.concatenate_cols([ dy.inputVector(init_embs[i]) for i in instance.sentence ]))
+            frozen_embs = dy.nobackprop(dy.transpose(dy.concatenate_cols([ dy.inputVector(init_embs[i]) for i in instance.sentence ])))
+            #frozen_embs = dy.transpose(dy.concatenate_cols([ dy.inputVector(init_embs[i]) for i in instance.sentence ]))
             embeddings_tensor = dy.transpose(dy.concatenate_cols([ model.words_lookup[i] for i in instance.sentence ]))
-            if options.debug and idx % 1000 == 999:
-                all_frozen_embs = dy.nobackprop(dy.transpose(dy.concatenate_cols([ dy.inputVector(init_embs[i]) for i in xrange(embs_shape[0]) ])))
-                all_embeddings_tensor = dy.transpose(dy.concatenate_cols([ model.words_lookup[i] for i in xrange(embs_shape[0]) ]))
-                print [all(all_frozen_embs.value()[i] == all_embeddings_tensor.value()[i]) for i in range(50,100,5)]
+            #if options.debug and idx % 1000 == 999:
+                #all_frozen_embs = dy.nobackprop(dy.transpose(dy.concatenate_cols([ dy.inputVector(init_embs[i]) for i in xrange(embs_shape[0]) ])))
+                #all_embeddings_tensor = dy.transpose(dy.concatenate_cols([ model.words_lookup[i] for i in xrange(embs_shape[0]) ]))
+                #print [all(all_frozen_embs.value()[i] == all_embeddings_tensor.value()[i]) for i in range(50,100,5)]
             kl_weight_expr = dy.inputVector([options.kl_weight])
-            kl_div = dy.cmult(utils.kl_div(embeddings_tensor, frozen_embs), kl_weight_expr)
+            kl_div = utils.kl_div(embeddings_tensor, frozen_embs)
+            weighted_kl_div = dy.cmult(kl_div, kl_weight_expr)
             if options.debug:
-                print "KL Div {} added to loss {}".format(kl_div.value(), loss_expr.value())
-            loss_expr = loss_expr + kl_div
+                print "KL Div {} with weight {} added to loss {}".format(kl_div.value(), options.kl_weight, loss_expr.value())
+            loss_expr = loss_expr + weighted_kl_div
         loss = loss_expr.scalar_value()
         
         # Bail if loss is NaN
@@ -699,7 +700,7 @@ for epoch in xrange(int(options.num_epochs)):
                                                                          gold_strings, obs_strings)])
                              + "\n").encode('utf8'))
             for g, o in zip(gold_strings, obs_strings):
-                f1_eval.add_instance(utils.split_tagstring(g), utils.split_tagstring(o))
+                f1_eval.add_instance(utils.split_tagstring(g, has_pos=True), utils.split_tagstring(o, has_pos=True))
             for att, tags in gold_tags.items():
                 out_tags = out_tags_set[att]
                 correct_sent = True
@@ -799,7 +800,7 @@ with open("{}/testout.txt".format(options.log_dir), 'w') as test_writer:
                                                                      gold_strings, obs_strings)])
                          + "\n").encode('utf8'))
         for g, o in zip(gold_strings, obs_strings):
-            f1_eval.add_instance(utils.split_tagstring(g), utils.split_tagstring(o))
+            f1_eval.add_instance(utils.split_tagstring(g, has_pos=True), utils.split_tagstring(o, has_pos=True))
         for att, tags in gold_tags.items():
             out_tags = out_tags_set[att]
             correct_sent = True

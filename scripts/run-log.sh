@@ -1,4 +1,4 @@
-nJ# 12/20
+# 12/20
 python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-noseq-varinit-char-05dr-avgtags --dev-output log-noseq-varinit-char-05dr-avgtags/devout.txt --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
 python model.py --dataset results/en_mtags-dd.pkl --log-dir log-noseq-randinit-char-05dr-avgtags --dev-output log-noseq-randinit-char-05dr-avgtags/devout.txt --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
 python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-noseq-varinit-nochar-05dr-avgtags --dev-output log-noseq-varinit-nochar-05dr-avgtags/devout.txt --dropout 0.5 --no-sequence-model --num-epochs 40;
@@ -180,8 +180,35 @@ python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en
 python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-noseq-semisupbp-varinit-char-05dr-sumtags --dropout 0.5 --no-sequence-model --semi-supervised --use-char-rnn --num-epochs 40;
 python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en-embeds-64-dim-char-prior-capitalized.txt --log-dir log-noseq-semisupbp-charcap64init-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --semi-supervised --num-epochs 40;
 python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en-embeds-64-dim-char-prior-capitalized.txt --log-dir log-noseq-semisupbp-charcap64init-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --semi-supervised --num-epochs 40;
-# semi-supervised with 10K KL term boost
+# semi-supervised with 10K KL term boost (1/24)
 python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-noseq-semisup10k-varinit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --semi-supervised --kl-weight 10000 --num-epochs 40;
 python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-noseq-semisup10k-varinit-char-05dr-sumtags --dropout 0.5 --no-sequence-model --semi-supervised --kl-weight 10000 --use-char-rnn --num-epochs 40;
 python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en-embeds-64-dim-char-prior-capitalized.txt --log-dir log-noseq-semisup10k-charcap64init-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --semi-supervised --kl-weight 10000 --num-epochs 40;
 python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en-embeds-64-dim-char-prior-capitalized.txt --log-dir log-noseq-semisup10k-charcap64init-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --semi-supervised --kl-weight 10000 --num-epochs 40;
+######## LOWERCASING BUG FIXED IN output_word_vectors.py ########
+# RERUN POLYGLOT BASIC FOR ALL LANGS (+ added low-resource) (1/25)
+python model.py --dataset results/uk_mtags-dd.pkl --word-embeddings data/embs/uk_polyglot_vectors_ud.txt --log-dir log-uk-noseq-pginit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/uk_mtags-dd.pkl --word-embeddings data/embs/uk_polyglot_vectors_ud.txt --log-dir log-uk-noseq-pginit-char-05dr-sumtags --dropout 0.5 --no-sequence-model --use-char-rnn --num-epochs 40;
+python model.py --dataset results/uk_mtags-pos.pkl --word-embeddings data/embs/uk_polyglot_vectors_ud.txt --log-dir log-uk-onlypos-noseq-pginit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/uk_mtags-pos.pkl --word-embeddings data/embs/uk_polyglot_vectors_ud.txt --log-dir log-uk-onlypos-noseq-pginit-char-05dr-sumtags --dropout 0.5 --no-sequence-model --use-char-rnn --num-epochs 40;
+python model.py --dataset results/tr_mtags-dd.pkl --word-embeddings data/embs/tr_polyglot_vectors_ud.txt --log-dir log-tr-noseq-pginit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/tr_mtags-dd.pkl --word-embeddings data/embs/tr_polyglot_vectors_ud.txt --log-dir log-tr-noseq-pginit-char-05dr-sumtags --dropout 0.5 --no-sequence-model --use-char-rnn --num-epochs 40;
+python model.py --dataset results/tr_mtags-pos.pkl --word-embeddings data/embs/tr_polyglot_vectors_ud.txt --log-dir log-tr-onlypos-noseq-pginit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/tr_mtags-pos.pkl --word-embeddings data/embs/tr_polyglot_vectors_ud.txt --log-dir log-tr-onlypos-noseq-pginit-char-05dr-sumtags --dropout 0.5 --no-sequence-model --use-char-rnn --num-epochs 40;
+# Re-running Varembed (Jan 25 night)
+python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-onlypos-noseq-varinit-nochar-05dr --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-pos.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-onlypos-noseq-varinit-char-05dr --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-noseq-varinit-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/en_mtags-dd.pkl --word-embeddings data/embs/en_wiki_vectors_varembed_ud.txt --log-dir log-noseq-varinit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/uk_mtags-pos.pkl --word-embeddings data/embs/uk_wiki_vectors_varembed_ud.txt --log-dir log-uk-onlypos-noseq-varinit-nochar-05dr --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/uk_mtags-pos.pkl --word-embeddings data/embs/uk_wiki_vectors_varembed_ud.txt --log-dir log-uk-onlypos-noseq-varinit-char-05dr --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/uk_mtags-dd.pkl --word-embeddings data/embs/uk_wiki_vectors_varembed_ud.txt --log-dir log-uk-noseq-varinit-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/uk_mtags-dd.pkl --word-embeddings data/embs/uk_wiki_vectors_varembed_ud.txt --log-dir log-uk-noseq-varinit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/it_mtags-pos.pkl --word-embeddings data/embs/it_wiki_vectors_varembed_ud.txt --log-dir log-it-onlypos-noseq-varinit-nochar-05dr --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/it_mtags-pos.pkl --word-embeddings data/embs/it_wiki_vectors_varembed_ud.txt --log-dir log-it-onlypos-noseq-varinit-char-05dr --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/it_mtags-dd.pkl --word-embeddings data/embs/it_wiki_vectors_varembed_ud.txt --log-dir log-it-noseq-varinit-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/it_mtags-dd.pkl --word-embeddings data/embs/it_wiki_vectors_varembed_ud.txt --log-dir log-it-noseq-varinit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/da_mtags-pos.pkl --word-embeddings data/embs/da_wiki_vectors_varembed_ud.txt --log-dir log-da-onlypos-noseq-varinit-nochar-05dr --dropout 0.5 --no-sequence-model --num-epochs 40;
+python model.py --dataset results/da_mtags-pos.pkl --word-embeddings data/embs/da_wiki_vectors_varembed_ud.txt --log-dir log-da-onlypos-noseq-varinit-char-05dr --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/da_mtags-dd.pkl --word-embeddings data/embs/da_wiki_vectors_varembed_ud.txt --log-dir log-da-noseq-varinit-char-05dr-sumtags --dropout 0.5 --use-char-rnn --no-sequence-model --num-epochs 40;
+python model.py --dataset results/da_mtags-dd.pkl --word-embeddings data/embs/da_wiki_vectors_varembed_ud.txt --log-dir log-da-noseq-varinit-nochar-05dr-sumtags --dropout 0.5 --no-sequence-model --num-epochs 40;
