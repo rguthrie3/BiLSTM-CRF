@@ -49,11 +49,11 @@ class BiLSTM_CRF:
         self.use_char_rnn = use_char_rnn
         if use_char_rnn:
             self.char_lookup = self.model.add_lookup_parameters((charset_size, 20))
-            self.char_bi_lstm = dy.BiRNNBuilder(1, 20, 128, self.model, dy.LSTMBuilder)
+            self.char_bi_lstm = dy.BiRNNBuilder(1, 20, hidden_dim, self.model, dy.LSTMBuilder)
 
         # Word LSTM parameters
         if use_char_rnn:
-            input_dim = word_embedding_dim + 128
+            input_dim = word_embedding_dim + hidden_dim
         else:
             input_dim = word_embedding_dim
         self.bi_lstm = dy.BiRNNBuilder(num_lstm_layers, input_dim, hidden_dim, self.model, dy.LSTMBuilder)
@@ -220,16 +220,20 @@ class BiLSTM_CRF:
                 bptrs_t.append(best_tag_id)
                 vvars_t.append(dy.pick(next_tag_expr, best_tag_id))
             for_expr = dy.concatenate(vvars_t) + obs
+            
+            # optional margin adaptation
             if use_margins and self.margins[att] != 0:
                 adjust = [self.margins[att]] * tagset_size
                 adjust[gold] = 0
                 for_expr = for_expr + dy.inputVector(adjust)
             backpointers.append(bptrs_t)
+        
         # Perform final transition to terminal
         terminal_expr = for_expr + trans_exprs[t2i[END_TAG]]
         terminal_arr  = terminal_expr.npvalue()
         best_tag_id   = np.argmax(terminal_arr)
         path_score    = dy.pick(terminal_expr, best_tag_id)
+        
         # Reverse over the backpointers to get the best path
         best_path = [best_tag_id] # Start with the tag that was best for terminal
         for bptrs_t in reversed(backpointers):
@@ -288,11 +292,11 @@ class LSTMTagger:
         self.use_char_rnn = use_char_rnn
         if use_char_rnn:
             self.char_lookup = self.model.add_lookup_parameters((charset_size, 20))
-            self.char_bi_lstm = dy.BiRNNBuilder(1, 20, 128, self.model, dy.LSTMBuilder)
+            self.char_bi_lstm = dy.BiRNNBuilder(1, 20, hidden_dim, self.model, dy.LSTMBuilder)
 
         # Word LSTM parameters
         if use_char_rnn:
-            input_dim = word_embedding_dim + 128
+            input_dim = word_embedding_dim + hidden_dim
         else:
             input_dim = word_embedding_dim
         self.word_bi_lstm = dy.BiRNNBuilder(num_lstm_layers, input_dim, hidden_dim, self.model, dy.LSTMBuilder)
