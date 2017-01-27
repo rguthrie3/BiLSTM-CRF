@@ -700,16 +700,13 @@ for epoch in xrange(int(options.num_epochs)):
                 
             gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
             obs_strings = utils.morphotag_strings(i2ts, out_tags_set, options.pos_separate_col)
-            dev_writer.write(("\n"
-                             + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
-                                                                         gold_strings, obs_strings)])
-                             + "\n").encode('utf8'))
             for g, o in zip(gold_strings, obs_strings):
                 f1_eval.add_instance(utils.split_tagstring(g, has_pos=True), utils.split_tagstring(o, has_pos=True))
             for att, tags in gold_tags.items():
                 out_tags = out_tags_set[att]
                 correct_sent = True
 
+                oov_strings = []
                 for word, gold, out in zip(instance.sentence, tags, out_tags):
                     if gold == out:
                         dev_correct[att] += 1
@@ -722,14 +719,19 @@ for epoch in xrange(int(options.num_epochs)):
                     
                     if i2w[word] not in training_vocab:
                         dev_oov_total[att] += 1
-                # if not correct_sent:
-                #     sent, tags = utils.convert_instance(instance, i2w, i2t)
-                #     for i in range(len(sent)):
-                #         logging.info( sent[i] + "\t" + tags[i] + "\t" + i2t[viterbi_tags[i]] )
-                #     logging.info( "\n\n\n" )
+                        oov_strings.append("OOV")
+                    else:
+                        oov_strings.append("")
+                        
                 dev_total[att] += len(tags)
                 
             dev_loss += (total_loss / len(instance.sentence))
+            
+            dev_writer.write(("\n"
+                             + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
+                                                                         gold_strings, obs_strings, oov_strings)])
+                             + "\n").encode('utf8'))
+            
 
     if options.viterbi:
         logging.info("POS Train Accuracy: {}".format(train_correct[POS_KEY] / train_total[POS_KEY]))
@@ -800,16 +802,13 @@ with open("{}/testout.txt".format(options.log_dir), 'w') as test_writer:
             
         gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
         obs_strings = utils.morphotag_strings(i2ts, out_tags_set, options.pos_separate_col)
-        test_writer.write(("\n"
-                         + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
-                                                                     gold_strings, obs_strings)])
-                         + "\n").encode('utf8'))
         for g, o in zip(gold_strings, obs_strings):
             f1_eval.add_instance(utils.split_tagstring(g, has_pos=True), utils.split_tagstring(o, has_pos=True))
         for att, tags in gold_tags.items():
             out_tags = out_tags_set[att]
             correct_sent = True
 
+            oov_strings = []
             for word, gold, out in zip(instance.sentence, tags, out_tags):
                 if gold == out:
                     test_correct[att] += 1
@@ -819,15 +818,18 @@ with open("{}/testout.txt".format(options.log_dir), 'w') as test_writer:
                     correct_sent = False
                     if i2w[word] not in training_vocab:
                         total_wrong_oov[att] += 1
+                        oov_strings.append("OOV")
+                    else:
+                        oov_strings.append("")
                 
                 if i2w[word] not in training_vocab:
                     test_oov_total[att] += 1
-            # if not correct_sent:
-            #     sent, tags = utils.convert_instance(instance, i2w, i2t)
-            #     for i in range(len(sent)):
-            #         logging.info( sent[i] + "\t" + tags[i] + "\t" + i2t[viterbi_tags[i]] )
-            #     logging.info( "\n\n\n" )
             test_total[att] += len(tags)
+        test_writer.write(("\n"
+                         + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
+                                                                     gold_strings, obs_strings, oov_strings)])
+                         + "\n").encode('utf8'))
+        
 
 logging.info("POS Test Accuracy: {}".format(test_correct[POS_KEY] / test_total[POS_KEY]))
 logging.info("POS % OOV accuracy: {}".format((test_oov_total[POS_KEY] - total_wrong_oov[POS_KEY]) / test_oov_total[POS_KEY]))

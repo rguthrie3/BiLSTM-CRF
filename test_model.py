@@ -433,16 +433,13 @@ with open("{}/{}out.txt".format(options.out_dir, devortest), 'w') as test_writer
             
         gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
         obs_strings = utils.morphotag_strings(i2ts, out_tags_set, options.pos_separate_col)
-        test_writer.write(("\n"
-                         + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
-                                                                     gold_strings, obs_strings)])
-                         + "\n").encode('utf8'))
         for g, o in zip(gold_strings, obs_strings):
             f1_eval.add_instance(utils.split_tagstring(g), utils.split_tagstring(o))
         for att, tags in gold_tags.items():
             out_tags = out_tags_set[att]
             correct_sent = True
 
+            oov_strings = []
             for word, gold, out in zip(instance.sentence, tags, out_tags):
                 if gold == out:
                     test_correct[att] += 1
@@ -455,13 +452,15 @@ with open("{}/{}out.txt".format(options.out_dir, devortest), 'w') as test_writer
                 
                 if i2w[word] not in training_vocab:
                     test_oov_total[att] += 1
-            # if not correct_sent:
-            #     sent, tags = utils.convert_instance(instance, i2w, i2t)
-            #     for i in range(len(sent)):
-            #         logging.info( sent[i] + "\t" + tags[i] + "\t" + i2t[viterbi_tags[i]] )
-            #     logging.info( "\n\n\n" )
+                    oov_strings.append("OOV")
+                else:
+                    oov_strings.append("")
             test_total[att] += len(tags)
-
+        test_writer.write(("\n"
+                         + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
+                                                                     gold_strings, obs_strings, oov_strings)])
+                         + "\n").encode('utf8'))
+        
             
 if options.use_dev:
     logging.info("POS Dev Accuracy: {}".format(test_correct[POS_KEY] / test_total[POS_KEY]))
