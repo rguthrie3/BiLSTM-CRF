@@ -63,11 +63,12 @@ class LSTMPredictor:
         return dy.squared_distance(observation, dy.inputVector(target_rep))
     
     def set_dropout(self, p):
-        self.char_bi_lstm.set_dropout(p)
-
+        self.char_fwd_lstm.set_dropout(p)
+        self.char_bwd_lstm.set_dropout(p)
 
     def disable_dropout(self):
-        self.char_bi_lstm.disable_dropout()
+        self.char_fwd_lstm.disable_dropout()
+        self.char_bwd_lstm.disable_dropout()
 
     def save(self, file_name):
         members_to_save = []
