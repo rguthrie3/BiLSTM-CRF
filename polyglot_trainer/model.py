@@ -120,6 +120,8 @@ logging.info("Training Algorithm: {}".format(type(trainer)))
 logging.info("Number training instances: {}".format(len(training_instances)))
 
 epcs = int(options.num_epochs)
+pretrained_vec_norms = 0.0
+inferred_vec_norms = 0.0
 # Shuffle set, divide into cross-folds each epoch
 for epoch in xrange(epcs):
     bar = progressbar.ProgressBar()
@@ -161,8 +163,10 @@ for epoch in xrange(epcs):
         if epoch == epcs - 1:
             word = ''.join([i2c[i] for i in instance.chars])
             if word in vocab_words:
+                pretrained_vec_norms += np.linalg.norm(instance.word_emb)
                 if options.all_from_lstm:
                     vocab_words[word] = np.array(obs_emb.value())
+                    inferred_vec_norms += np.linalg.norm(vocab_words[word])
                 else: # log vocab embeddings
                     vocab_words[word] = instance.word_emb
         
@@ -186,13 +190,18 @@ for epoch in xrange(epcs):
         if epoch == epcs - 1:
             word = ''.join([i2c[i] for i in instance.chars])
             if word in vocab_words:
+                pretrained_vec_norms += np.linalg.norm(instance.word_emb)
                 if options.all_from_lstm:
                     vocab_words[word] = np.array(obs_emb.value())
+                    inferred_vec_norms += np.linalg.norm(vocab_words[word])
                 else: # log vocab embeddings
                     vocab_words[word] = instance.word_emb
     
     logging.info("Train Loss: {}".format(train_loss))
     logging.info("Dev Loss: {}".format(dev_loss))
+
+logging.info("\n")
+logging.info("Average norm for pre-trained in vocab: {}".format(pretrained_vec_norms / len(training_instances)))
 
 # Infer for test set
 bar = progressbar.ProgressBar()
@@ -200,8 +209,11 @@ for instance in bar(test_instances):
     word = ''.join([i2c[i] for i in instance.chars])
     obs_emb = model.predict_emb(instance.chars)
     vocab_words[word] = np.array(obs_emb.value())
+    inferred_vec_norms += np.linalg.norm(vocab_words[word])
+    
+logging.info("Average norm for trained: {}".format(inferred_vec_norms / len(test_instances)))
 
-# write all (including vocab words in training data, based on options.all_from_lstm)
+# write all
 with open(options.output, "w") as writer:
     for vw, emb in vocab_words.iteritems():
         writer.write(vw + " ")
