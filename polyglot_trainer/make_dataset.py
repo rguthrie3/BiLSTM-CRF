@@ -54,6 +54,7 @@ with codecs.open(options.output, "w", "utf-8") as outfile:
     in_vocab = 0
     total = len(vocab)
     for word, emb in zip(words, embs):
+        if word == POLYGLOT_UNK: continue
         if word in vocab:
             in_vocab += 1
         training_instances.append(Instance(charseq(word, c2i), emb))
@@ -64,6 +65,8 @@ with codecs.open(options.output, "w", "utf-8") as outfile:
     print "Total in Training Vocabulary:", in_vocab
     print "Percentage in-vocab:", in_vocab / total
     print "Total in Embeddings vocabulary:", len(words)
+
+c2i[PADDING_CHAR] = len(c2i)
 
 # populate output
 output = {}
