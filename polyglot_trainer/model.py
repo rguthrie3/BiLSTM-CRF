@@ -27,8 +27,8 @@ class LSTMPredictor:
         self.char_lookup = self.model.add_lookup_parameters((charset_size, char_dim))
         self.char_bi_lstm = dy.BiRNNBuilder(num_lstm_layers, char_dim, hidden_dim, self.model, dy.LSTMBuilder)
         
-		# Post-LSTM Parameters
-		self.lstm_to_rep_params = self.model.add_parameters((word_embedding_dim, hidden_dim * 2))
+        # Post-LSTM Parameters
+        self.lstm_to_rep_params = self.model.add_parameters((word_embedding_dim, hidden_dim * 2))
         self.lstm_to_rep_bias = self.model.add_parameters(word_embedding_dim)
         self.mlp_out = self.model.add_parameters((word_embedding_dim, word_embedding_dim))
         self.mlp_out_bias = self.model.add_parameters(word_embedding_dim)
@@ -36,12 +36,12 @@ class LSTMPredictor:
     def build_graph(self, chars):
         dy.renew_cg()
 
-		pad_char = c2i[PADDING_CHAR]
+        pad_char = c2i[PADDING_CHAR]
         char_ids = [pad_char] + chars + [pad_char]
-		embeddings = [self.char_lookup[cid] for cid in char_ids]
+        embeddings = [self.char_lookup[cid] for cid in char_ids]
 
         bi_lstm_out = self.char_bi_lstm.transduce(embeddings)
-		rep = dy.concatenate([bi_lstm_out[0], bi_lstm_out[-1]]) # TODO Make sure this shouldn't be just -1
+        rep = dy.concatenate([bi_lstm_out[0], bi_lstm_out[-1]]) # TODO Make sure this shouldn't be just -1
 
         H = dy.parameter(self.lstm_to_rep_params)
         Hb = dy.parameter(self.lstm_to_rep_bias)
@@ -74,7 +74,7 @@ class LSTMPredictor:
     @property
     def model(self):
         return self.model
-		
+        
 # ===-----------------------------------------------------------------------===
 # Argument parsing
 # ===-----------------------------------------------------------------------===
