@@ -51,8 +51,7 @@ class LSTMPredictor:
 
     def loss(self, chars, target_rep):
         observation = self.build_graph(chars)
-        # TODO
-        return errors
+        return dy.squared_distance(observation, dy.inputVector(target_rep)) # maybe wrap with dy.sqrt()
 
     
     def set_dropout(self, p):
@@ -75,3 +74,27 @@ class LSTMPredictor:
     @property
     def model(self):
         return self.model
+		
+# ===-----------------------------------------------------------------------===
+# Argument parsing
+# ===-----------------------------------------------------------------------===
+parser = argparse.ArgumentParser()
+parser.add_argument("--dataset", required=True, dest="dataset", help=".pkl file to use")
+parser.add_argument("--vocab", required=True, dest="vocab", help="total vocab to output")
+parser.add_argument("--output", required=True, dest="output", help="file with all embeddings")
+parser.add_argument("--char-dim", dest="char_dim", help="dimension for character embeddings (default = 20)")
+parser.add_argument("--hidden-dim", dest="hidden_dim", help="dimension for LSTM layers (default = 50)")
+parser.add_argument("--num-lstm-layers", dest="num_lstm_layers", help="Number of LSTM layers (default = 1)")
+parser.add_argument("--all-from-lstm", dest="all_from_lstm", action="store_true", help="if toggled, vectors in original training set are overriden by LSTM-generated vectors")
+parser.add_argument("--dropout", default=-1, dest="dropout", type=float, help="amount of dropout to apply to LSTM part of graph")
+parser.add_argument("--num-epochs", default=20, dest="num_epochs", type=int, help="Number of full passes through training set (default = 20)")
+parser.add_argument("--learning-rate", default=0.01, dest="learning_rate", type=float, help="Initial learning rate")
+parser.add_argument("--dynet-mem", help="Ignore this outside argument")
+parser.add_argument("--debug", dest="debug", action="store_true", help="Debug mode")
+options = parser.parse_args()
+
+# Load training set
+
+# Shuffle set, divide into cross-folds each iteration
+
+# Infer for test set, write all (including vocab words in training data, based on options.all_from_lstm)
