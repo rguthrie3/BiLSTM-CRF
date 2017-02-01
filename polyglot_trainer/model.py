@@ -33,8 +33,8 @@ class LSTMPredictor:
         # Post-LSTM Parameters
         self.lstm_to_rep_params = self.model.add_parameters((word_embedding_dim, hidden_dim * 2))
         self.lstm_to_rep_bias = self.model.add_parameters(word_embedding_dim)
-        self.mlp_out = self.model.add_parameters((word_embedding_dim, word_embedding_dim))
-        self.mlp_out_bias = self.model.add_parameters(word_embedding_dim)
+        #self.mlp_out = self.model.add_parameters((word_embedding_dim, word_embedding_dim))
+        #self.mlp_out_bias = self.model.add_parameters(word_embedding_dim)
 
     def predict_emb(self, chars):
         dy.renew_cg()
@@ -44,13 +44,16 @@ class LSTMPredictor:
         embeddings = [self.char_lookup[cid] for cid in char_ids]
 
         bi_lstm_out = self.char_bi_lstm.transduce(embeddings)
-        rep = dy.concatenate([bi_lstm_out[0], bi_lstm_out[-1]]) # TODO Make sure this shouldn't be just -1
+		
+        #rep = bi_lstm_out[0] + bi_lstm_out[-1] # in case the beginning of for and back are zeros (they don't seem to be, according to printouts)
+        rep = dy.concatenate([bi_lstm_out[0], bi_lstm_out[-1]]) # Make sure this shouldn't be just -1
 
         H = dy.parameter(self.lstm_to_rep_params)
         Hb = dy.parameter(self.lstm_to_rep_bias)
-        O = dy.parameter(self.mlp_out)
-        Ob = dy.parameter(self.mlp_out_bias)
-        return O * dy.tanh(H * rep + Hb) + Ob
+        #O = dy.parameter(self.mlp_out)
+        #Ob = dy.parameter(self.mlp_out_bias)
+        return H * rep + Hb
+		#return O * dy.tanh(H * rep + Hb) + Ob
 
     def loss(self, observation, target_rep):
         return dy.squared_distance(observation, dy.inputVector(target_rep)) # maybe wrap with dy.sqrt()
