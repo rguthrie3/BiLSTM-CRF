@@ -28,35 +28,39 @@ class LSTMPredictor:
         
         # Char LSTM Parameters
         self.char_lookup = self.model.add_lookup_parameters((charset_size, char_dim))
-        self.char_bi_lstm = dy.BiRNNBuilder(num_lstm_layers, char_dim, hidden_dim, self.model, dy.LSTMBuilder)
+        self.char_fwd_lstm = dy.LSTMBuilder(num_lstm_layers, char_dim, hidden_dim, self.model)
+        self.char_bwd_lstm = dy.LSTMBuilder(num_lstm_layers, char_dim, hidden_dim, self.model)
         
         # Post-LSTM Parameters
         self.lstm_to_rep_params = self.model.add_parameters((word_embedding_dim, hidden_dim * 2))
         self.lstm_to_rep_bias = self.model.add_parameters(word_embedding_dim)
-        #self.mlp_out = self.model.add_parameters((word_embedding_dim, word_embedding_dim))
-        #self.mlp_out_bias = self.model.add_parameters(word_embedding_dim)
+        self.mlp_out = self.model.add_parameters((word_embedding_dim, word_embedding_dim))
+        self.mlp_out_bias = self.model.add_parameters(word_embedding_dim)
 
     def predict_emb(self, chars):
         dy.renew_cg()
+        
+        finit = self.char_fwd_lstm.initial_state()
+        binit = self.char_bwd_lstm.initial_state()
+        
+        H = dy.parameter(self.lstm_to_rep_params)
+        Hb = dy.parameter(self.lstm_to_rep_bias)
+        O = dy.parameter(self.mlp_out)
+        Ob = dy.parameter(self.mlp_out_bias)
 
         pad_char = c2i[PADDING_CHAR]
         char_ids = [pad_char] + chars + [pad_char]
         embeddings = [self.char_lookup[cid] for cid in char_ids]
 
-        bi_lstm_out = self.char_bi_lstm.transduce(embeddings)
-		
-        #rep = bi_lstm_out[0] + bi_lstm_out[-1] # in case the beginning of for and back are zeros (they don't seem to be, according to printouts)
-        rep = dy.concatenate([bi_lstm_out[0], bi_lstm_out[-1]]) # Make sure this shouldn't be just -1
+        bi_fwd_out = finit.transduce(embeddings)
+        bi_bwd_out = binit.transduce(reversed(embeddings))
+        
+        rep = dy.concatenate([bi_fwd_out[-1], bi_bwd_out[-1]])
 
-        H = dy.parameter(self.lstm_to_rep_params)
-        Hb = dy.parameter(self.lstm_to_rep_bias)
-        #O = dy.parameter(self.mlp_out)
-        #Ob = dy.parameter(self.mlp_out_bias)
-        return H * rep + Hb
-		#return O * dy.tanh(H * rep + Hb) + Ob
+        return O * dy.tanh(H * rep + Hb) + Ob
 
     def loss(self, observation, target_rep):
-        return dy.squared_distance(observation, dy.inputVector(target_rep)) # maybe wrap with dy.sqrt()
+        return dy.squared_distance(observation, dy.inputVector(target_rep))
     
     def set_dropout(self, p):
         self.char_bi_lstm.set_dropout(p)
