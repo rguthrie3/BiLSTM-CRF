@@ -20,7 +20,7 @@ Instance = collections.namedtuple("Instance", ["chars", "word_emb"])
 
 class LSTMPredictor:
 
-    def __init__(self, num_lstm_layers, hidden_dim=64, charset_size, char_dim=20, vocab_size=None, word_embedding_dim=64):
+    def __init__(self, num_lstm_layers, charset_size, char_dim=20, hidden_dim=50, word_embedding_dim=64, vocab_size=None):
         self.model = dy.Model()
         
         # Char LSTM Parameters
@@ -28,7 +28,7 @@ class LSTMPredictor:
         self.char_bi_lstm = dy.BiRNNBuilder(num_lstm_layers, char_dim, hidden_dim, self.model, dy.LSTMBuilder)
         
 		# Post-LSTM Parameters
-		self.lstm_to_rep_params = self.model.add_parameters((word_embedding_dim, hidden_dim))
+		self.lstm_to_rep_params = self.model.add_parameters((word_embedding_dim, hidden_dim * 2))
         self.lstm_to_rep_bias = self.model.add_parameters(word_embedding_dim)
         self.mlp_out = self.model.add_parameters((word_embedding_dim, word_embedding_dim))
         self.mlp_out_bias = self.model.add_parameters(word_embedding_dim)
@@ -41,7 +41,7 @@ class LSTMPredictor:
 		embeddings = [self.char_lookup[cid] for cid in char_ids]
 
         bi_lstm_out = self.char_bi_lstm.transduce(embeddings)
-		rep = bi_lstm_out[0] + bi_lstm_out[-1] # TODO Make sure this shouldn't be just -1
+		rep = dy.concatenate([bi_lstm_out[0], bi_lstm_out[-1]]) # TODO Make sure this shouldn't be just -1
 
         H = dy.parameter(self.lstm_to_rep_params)
         Hb = dy.parameter(self.lstm_to_rep_bias)
