@@ -1,6 +1,5 @@
 from __future__ import division
 from collections import Counter
-from evaluate_morphotags import Evaluator
 
 import collections
 import argparse
@@ -10,17 +9,21 @@ import logging
 import progressbar
 import os
 import math
+import datetime
 import dynet as dy
 import numpy as np
 
 POLYGLOT_UNK = unicode("<UNK>")
 PADDING_CHAR = "<*>"
 
+DEFAULT_CHAR_DIM = 20
+DEFAULT_HIDDEN_DIM = 50
+
 Instance = collections.namedtuple("Instance", ["chars", "word_emb"])
 
 class LSTMPredictor:
 
-    def __init__(self, num_lstm_layers, charset_size, char_dim=20, hidden_dim=50, word_embedding_dim=64, vocab_size=None):
+    def __init__(self, num_lstm_layers, charset_size, char_dim, hidden_dim, word_embedding_dim, vocab_size=None):
         self.model = dy.Model()
         
         # Char LSTM Parameters
@@ -33,7 +36,7 @@ class LSTMPredictor:
         self.mlp_out = self.model.add_parameters((word_embedding_dim, word_embedding_dim))
         self.mlp_out_bias = self.model.add_parameters(word_embedding_dim)
 
-    def build_graph(self, chars):
+    def predict_emb(self, chars):
         dy.renew_cg()
 
         pad_char = c2i[PADDING_CHAR]
@@ -49,10 +52,8 @@ class LSTMPredictor:
         Ob = dy.parameter(self.mlp_out_bias)
         return O * dy.tanh(H * rep + Hb) + Ob
 
-    def loss(self, chars, target_rep):
-        observation = self.build_graph(chars)
+    def loss(self, observation, target_rep):
         return dy.squared_distance(observation, dy.inputVector(target_rep)) # maybe wrap with dy.sqrt()
-
     
     def set_dropout(self, p):
         self.char_bi_lstm.set_dropout(p)
@@ -82,19 +83,128 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--dataset", required=True, dest="dataset", help=".pkl file to use")
 parser.add_argument("--vocab", required=True, dest="vocab", help="total vocab to output")
 parser.add_argument("--output", required=True, dest="output", help="file with all embeddings")
-parser.add_argument("--char-dim", dest="char_dim", help="dimension for character embeddings (default = 20)")
-parser.add_argument("--hidden-dim", dest="hidden_dim", help="dimension for LSTM layers (default = 50)")
-parser.add_argument("--num-lstm-layers", dest="num_lstm_layers", help="Number of LSTM layers (default = 1)")
+parser.add_argument("--char-dim",  default=DEFAULT_CHAR_DIM, dest="char_dim", help="dimension for character embeddings (default = 20)")
+parser.add_argument("--hidden-dim",  default=DEFAULT_HIDDEN_DIM, dest="hidden_dim", help="dimension for LSTM layers (default = 50)")
+parser.add_argument("--num-lstm-layers", default=1, dest="num_lstm_layers", help="Number of LSTM layers (default = 1)")
 parser.add_argument("--all-from-lstm", dest="all_from_lstm", action="store_true", help="if toggled, vectors in original training set are overriden by LSTM-generated vectors")
 parser.add_argument("--dropout", default=-1, dest="dropout", type=float, help="amount of dropout to apply to LSTM part of graph")
-parser.add_argument("--num-epochs", default=20, dest="num_epochs", type=int, help="Number of full passes through training set (default = 20)")
+parser.add_argument("--num-epochs", default=10, dest="num_epochs", type=int, help="Number of full passes through training set (default = 10)")
 parser.add_argument("--learning-rate", default=0.01, dest="learning_rate", type=float, help="Initial learning rate")
 parser.add_argument("--dynet-mem", help="Ignore this outside argument")
 parser.add_argument("--debug", dest="debug", action="store_true", help="Debug mode")
 options = parser.parse_args()
 
+# Set up logging
+log_dir = "embedding_train_charlstm-{}".format(datetime.datetime.now().strftime('%y%m%d%H%M%S'))
+os.mkdir(log_dir)
+logging.basicConfig(filename=log_dir + "/log.txt", filemode="w", format="%(message)s", level=logging.INFO)
+
 # Load training set
+dataset = cPickle.load(open(options.dataset, "r"))
+c2i = dataset["c2i"]
+i2c = { i: c for c, i in c2i.items() } # inverse map
+training_instances = dataset["training_instances"]
+test_instances = dataset["test_instances"]
+emb_dim = len(training_instances[0].word_emb)
 
-# Shuffle set, divide into cross-folds each iteration
+# Load words to write
+vocab_words = {}
+with open(options.vocab, "r") as vocab_file:
+    for vw in vocab_file.readlines():
+        vocab_words[vw.strip()] = np.array([0])
 
-# Infer for test set, write all (including vocab words in training data, based on options.all_from_lstm)
+model = LSTMPredictor(options.num_lstm_layers, len(c2i), options.char_dim, options.hidden_dim, emb_dim, vocab_size=None)
+trainer = dy.MomentumSGDTrainer(model.model, options.learning_rate, 0.9, 0.1)
+logging.info("Training Algorithm: {}".format(type(trainer)))
+
+logging.info("Number training instances: {}".format(len(training_instances)))
+
+epcs = int(options.num_epochs)
+# Shuffle set, divide into cross-folds each epoch
+for epoch in xrange(epcs):
+    bar = progressbar.ProgressBar()
+    random.shuffle(training_instances)
+    
+    # random 10% fold for validation
+    dev_cutoff = int(9 * len(training_instances) / 10)
+    dev_instances = training_instances[dev_cutoff:]
+    train_instances = training_instances[:dev_cutoff]
+    train_loss = 0.0
+    train_correct = Counter()
+    train_total = Counter()
+
+    if options.dropout > 0:
+        model.set_dropout(options.dropout)
+
+    if options.debug:
+        train_instances = train_instances[:int(len(training_instances)/20)]
+        dev_instances = dev_instances[:int(len(dev_instances)/20)]
+    else:
+        train_instances = train_instances
+    
+    for instance in bar(train_instances):
+        if len(instance.chars) <= 0: continue
+        obs_emb = model.predict_emb(instance.chars)
+        loss_expr = model.loss(obs_emb, instance.word_emb)
+        loss = loss_expr.scalar_value()
+        
+        # Bail if loss is NaN
+        if math.isnan(loss):
+            assert False, "NaN occured"
+            
+        train_loss += loss
+
+        # Do backward pass and update parameters
+        loss_expr.backward()
+        trainer.update()
+        
+        if epoch == epcs - 1:
+            word = ''.join([i2c[i] for i in instance.chars])
+            if word in vocab_words:
+                if options.all_from_lstm:
+                    vocab_words[word] = np.array(obs_emb.value())
+                else: # log vocab embeddings
+                    vocab_words[word] = instance.word_emb
+        
+    logging.info("\n")
+    logging.info("Epoch {} complete".format(epoch + 1))
+    trainer.update_epoch(1)
+    print trainer.status()
+    
+    # Evaluate dev data (remember it's not the same set each epoch)
+    model.disable_dropout()
+    dev_loss = 0.0
+    dev_correct = Counter()
+    dev_total = Counter()
+    
+    bar = progressbar.ProgressBar()
+    for instance in bar(dev_instances):
+        if len(instance.chars) <= 0: continue
+        obs_emb = model.predict_emb(instance.chars)
+        dev_loss += model.loss(obs_emb, instance.word_emb).scalar_value()
+        
+        if epoch == epcs - 1:
+            word = ''.join([i2c[i] for i in instance.chars])
+            if word in vocab_words:
+                if options.all_from_lstm:
+                    vocab_words[word] = np.array(obs_emb.value())
+                else: # log vocab embeddings
+                    vocab_words[word] = instance.word_emb
+    
+    logging.info("Train Loss: {}".format(train_loss))
+    logging.info("Dev Loss: {}".format(dev_loss))
+
+# Infer for test set
+bar = progressbar.ProgressBar()
+for instance in bar(test_instances):
+    word = ''.join([i2c[i] for i in instance.chars])
+    obs_emb = model.predict_emb(instance.chars)
+    vocab_words[word] = np.array(obs_emb.value())
+
+# write all (including vocab words in training data, based on options.all_from_lstm)
+with open(options.output, "w") as writer:
+    for vw, emb in vocab_words.iteritems():
+        writer.write(vw + " ")
+        for i in emb:
+            writer.write(str(i) + " ")
+        writer.write("\n")
