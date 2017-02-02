@@ -10,6 +10,7 @@ import progressbar
 import os
 import math
 import datetime
+import codecs
 import dynet as dy
 import numpy as np
 
@@ -91,8 +92,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--dataset", required=True, dest="dataset", help=".pkl file to use")
 parser.add_argument("--vocab", required=True, dest="vocab", help="total vocab to output")
 parser.add_argument("--output", required=True, dest="output", help="file with all embeddings")
-parser.add_argument("--char-dim",  default=DEFAULT_CHAR_DIM, dest="char_dim", help="dimension for character embeddings (default = 20)")
-parser.add_argument("--hidden-dim",  default=DEFAULT_HIDDEN_DIM, dest="hidden_dim", help="dimension for LSTM layers (default = 50)")
+parser.add_argument("--lang", dest="lang", default="en", help="language")
+parser.add_argument("--char-dim", default=DEFAULT_CHAR_DIM, dest="char_dim", help="dimension for character embeddings (default = 20)")
+parser.add_argument("--hidden-dim", default=DEFAULT_HIDDEN_DIM, dest="hidden_dim", help="dimension for LSTM layers (default = 50)")
 parser.add_argument("--num-lstm-layers", default=1, dest="num_lstm_layers", help="Number of LSTM layers (default = 1)")
 parser.add_argument("--all-from-lstm", dest="all_from_lstm", action="store_true", help="if toggled, vectors in original training set are overriden by LSTM-generated vectors")
 parser.add_argument("--dropout", default=-1, dest="dropout", type=float, help="amount of dropout to apply to LSTM part of graph")
@@ -103,7 +105,7 @@ parser.add_argument("--debug", dest="debug", action="store_true", help="Debug mo
 options = parser.parse_args()
 
 # Set up logging
-log_dir = "embedding_train_charlstm-{}".format(datetime.datetime.now().strftime('%y%m%d%H%M%S'))
+log_dir = "embedding_train_charlstm-{}-{}".format(datetime.datetime.now().strftime('%y%m%d%H%M%S'), options.lang)
 os.mkdir(log_dir)
 logging.basicConfig(filename=log_dir + "/log.txt", filemode="w", format="%(message)s", level=logging.INFO)
 
@@ -117,7 +119,7 @@ emb_dim = len(training_instances[0].word_emb)
 
 # Load words to write
 vocab_words = {}
-with open(options.vocab, "r") as vocab_file:
+with codecs.open(options.vocab, "r", "utf-8") as vocab_file:
     for vw in vocab_file.readlines():
         vocab_words[vw.strip()] = np.array([0])
 
@@ -222,7 +224,7 @@ for instance in bar(test_instances):
 logging.info("Average norm for trained: {}".format(inferred_vec_norms / len(test_instances)))
 
 # write all
-with open(options.output, "w") as writer:
+with codecs.open(options.output, "w", "utf-8") as writer:
     for vw, emb in vocab_words.iteritems():
         writer.write(vw + " ")
         for i in emb:
