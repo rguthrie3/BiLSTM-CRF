@@ -84,7 +84,11 @@ class LSTMPredictor:
     @property
     def model(self):
         return self.model
-        
+ 
+
+def wordify(instance):
+    return ''.join([i2c[i] for i in instance.chars])
+ 
 # ===-----------------------------------------------------------------------===
 # Argument parsing
 # ===-----------------------------------------------------------------------===
@@ -109,6 +113,10 @@ log_dir = "embedding_train_charlstm-{}-{}".format(datetime.datetime.now().strfti
 os.mkdir(log_dir)
 logging.basicConfig(filename=log_dir + "/log.txt", filemode="w", format="%(message)s", level=logging.INFO)
 
+logging.info("Training dataset: {}".format(options.dataset))
+logging.info("Output vocabulary: {}".format(options.vocab))
+logging.info("Output location: {}\n".format(options.output))
+
 # Load training set
 dataset = cPickle.load(open(options.dataset, "r"))
 c2i = dataset["c2i"]
@@ -129,30 +137,31 @@ logging.info("Training Algorithm: {}".format(type(trainer)))
 
 logging.info("Number training instances: {}".format(len(training_instances)))
 
+# Create dev set
+random.shuffle(training_instances)
+dev_cutoff = int(99 * len(training_instances) / 100)
+dev_instances = training_instances[dev_cutoff:]
+training_instances = training_instances[:dev_cutoff]
+
+if options.debug:
+    train_instances = training_instances[:int(len(training_instances)/20)]
+    dev_instances = dev_instances[:int(len(dev_instances)/20)]
+else:
+    train_instances = training_instances
+
 epcs = int(options.num_epochs)
 pretrained_vec_norms = 0.0
 inferred_vec_norms = 0.0
 # Shuffle set, divide into cross-folds each epoch
 for epoch in xrange(epcs):
     bar = progressbar.ProgressBar()
-    random.shuffle(training_instances)
     
-    # random 10% fold for validation
-    dev_cutoff = int(9 * len(training_instances) / 10)
-    dev_instances = training_instances[dev_cutoff:]
-    train_instances = training_instances[:dev_cutoff]
     train_loss = 0.0
     train_correct = Counter()
     train_total = Counter()
 
     if options.dropout > 0:
         model.set_dropout(options.dropout)
-
-    if options.debug:
-        train_instances = train_instances[:int(len(training_instances)/20)]
-        dev_instances = dev_instances[:int(len(dev_instances)/20)]
-    else:
-        train_instances = train_instances
     
     for instance in bar(train_instances):
         if len(instance.chars) <= 0: continue
@@ -171,7 +180,7 @@ for epoch in xrange(epcs):
         trainer.update()
         
         if epoch == epcs - 1:
-            word = ''.join([i2c[i] for i in instance.chars])
+            word = wordify(instance)
             if word in vocab_words:
                 pretrained_vec_norms += np.linalg.norm(instance.word_emb)
                 if options.all_from_lstm:
@@ -198,7 +207,7 @@ for epoch in xrange(epcs):
         dev_loss += model.loss(obs_emb, instance.word_emb).scalar_value()
         
         if epoch == epcs - 1:
-            word = ''.join([i2c[i] for i in instance.chars])
+            word = wordify(instance)
             if word in vocab_words:
                 pretrained_vec_norms += np.linalg.norm(instance.word_emb)
                 if options.all_from_lstm:
@@ -211,17 +220,34 @@ for epoch in xrange(epcs):
     logging.info("Dev Loss: {}".format(dev_loss))
 
 logging.info("\n")
-logging.info("Average norm for pre-trained in vocab: {}".format(pretrained_vec_norms / len(training_instances)))
+logging.info("Average norm for pre-trained in vocab: {}".format(pretrained_vec_norms / (len(training_instances) + len(dev_instances))))
 
 # Infer for test set
-bar = progressbar.ProgressBar()
-for instance in bar(test_instances):
-    word = ''.join([i2c[i] for i in instance.chars])
+showcase_size = 10
+showcase = [] # sample for similarity sanity check
+for idx, instance in enumerate(test_instances):
+    word = wordify(instance)
     obs_emb = model.predict_emb(instance.chars)
     vocab_words[word] = np.array(obs_emb.value())
     inferred_vec_norms += np.linalg.norm(vocab_words[word])
     
+    # reservoir sampling
+    if idx < showcase_size:
+        showcase.append(word)
+    else:
+        rand = random.randint(0,idx-1)
+        if rand < showcase_size:
+            showcase[rand] = word
+    
 logging.info("Average norm for trained: {}".format(inferred_vec_norms / len(test_instances)))
+
+similar_words = {}
+for w in showcase:
+    vec = vocab_words[word]
+    top_five = [wordify(instance) for instance in sorted(test_instances, key=lambda inst:np.linalg.norm(inst.word_emb - vec), reverse=True)[:5]]
+    similar_words[w] = top_five
+
+logging.info("\nSome most-similar words from training set for a random selection of test set:\n{}".format("\n".join([k + ": " + " ".join(v) for k,v in similar_words.iteritems()])))
 
 # write all
 with codecs.open(options.output, "w", "utf-8") as writer:
