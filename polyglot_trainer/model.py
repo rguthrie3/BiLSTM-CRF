@@ -244,7 +244,7 @@ logging.info("Average norm for trained: {}".format(inferred_vec_norms / len(test
 similar_words = {}
 for w in showcase:
     vec = vocab_words[word]
-    top_five = [wordify(instance) for instance in sorted(test_instances, key=lambda inst:np.linalg.norm(inst.word_emb - vec), reverse=True)[:5]]
+    top_five = [wordify(instance) for instance in sorted(training_instances, key=lambda inst:np.linalg.norm(inst.word_emb - vec), reverse=True)[:5]]
     similar_words[w] = top_five
 
 logging.info("\nSome most-similar words from training set for a random selection of test set:\n{}".format("\n".join([k + ": " + " ".join(v) for k,v in similar_words.iteritems()])))
