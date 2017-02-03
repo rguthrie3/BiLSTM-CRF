@@ -223,7 +223,8 @@ logging.info("\n")
 logging.info("Average norm for pre-trained in vocab: {}".format(pretrained_vec_norms / (len(training_instances) + len(dev_instances))))
 
 # Infer for test set
-showcase_size = 10
+showcase_size = 25
+top_to_show = 10
 showcase = [] # sample for similarity sanity check
 for idx, instance in enumerate(test_instances):
     word = wordify(instance)
@@ -244,10 +245,10 @@ logging.info("Average norm for trained: {}".format(inferred_vec_norms / len(test
 similar_words = {}
 for w in showcase:
     vec = vocab_words[word]
-    top_five = [wordify(instance) for instance in sorted(training_instances, key=lambda inst:np.linalg.norm(inst.word_emb - vec), reverse=True)[:5]]
+    top_five = [wordify(instance) for instance in sorted(training_instances, key=lambda inst:np.linalg.norm(inst.word_emb - vec))[:top_to_show]]
     similar_words[w] = top_five
 
-logging.info("\nSome most-similar words from training set for a random selection of test set:\n{}".format("\n".join([k + ": " + " ".join(v) for k,v in similar_words.iteritems()])))
+logging.info("\nSome most-similar words from training set for a random selection of test set:\n{}".format("\n".join([k + ":\t" + " ".join(v) for k,v in similar_words.iteritems()])))
 
 # write all
 with codecs.open(options.output, "w", "utf-8") as writer:
