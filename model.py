@@ -28,22 +28,23 @@ DEFAULT_WORD_EMBEDDING_SIZE = 64
 
 class BiLSTM_CRF:
 
-    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, use_char_rnn, charset_size, train_vocab_ctr, margins, lowercase_words, vocab_size=None):
+    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, no_we_update, use_char_rnn, charset_size, train_vocab_ctr, margins, lowercase_words, vocab_size=None):
         self.model = dy.Model()
         self.tagset_sizes = tagset_sizes
         self.train_vocab_ctr = train_vocab_ctr
         self.margins = margins
+        self.we_update = not no_we_update
         self.lowercase_words = lowercase_words
 
         # Word embedding parameters
         if word_embeddings is not None: # Use pretrained embeddings
             vocab_size = word_embeddings.shape[0]
             word_embedding_dim = word_embeddings.shape[1]
-            self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
-            self.words_lookup.init_from_array(word_embeddings)
         else:
             word_embedding_dim = DEFAULT_WORD_EMBEDDING_SIZE
-            self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
+        self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
+        if word_embeddings is not None:
+            self.words_lookup.init_from_array(word_embeddings)
         
         # Char LSTM Parameters
         self.use_char_rnn = use_char_rnn
@@ -95,7 +96,7 @@ class BiLSTM_CRF:
                 word_in_ds = word
         else:
             word_in_ds = word
-        wemb = self.words_lookup[word_in_ds]
+        wemb = dy.lookup(self.words_lookup, word_in_ds, update=self.we_update)
         if self.use_char_rnn:
             pad_char = c2i[PADDING_CHAR]
             # Note: use original casing ("word") for characters
@@ -269,11 +270,12 @@ class BiLSTM_CRF:
 
 class LSTMTagger:
 
-    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, train_vocab_ctr, use_char_rnn, charset_size, lowercase_words, att_props=None, vocab_size=None, word_embedding_dim=None):
+    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, no_we_update, train_vocab_ctr, use_char_rnn, charset_size, lowercase_words, att_props=None, vocab_size=None, word_embedding_dim=None):
         self.model = dy.Model()
         self.tagset_sizes = tagset_sizes
         self.train_vocab_ctr = train_vocab_ctr
         self.attributes = tagset_sizes.keys()
+        self.we_update = not no_we_update
         self.lowercase_words = lowercase_words
         if att_props is not None:
             self.att_props = {att:(1.0-p) for att,p in att_props.iteritems()}
@@ -283,10 +285,11 @@ class LSTMTagger:
         if word_embeddings is not None: # Use pretrained embeddings
             vocab_size = word_embeddings.shape[0]
             word_embedding_dim = word_embeddings.shape[1]
-            self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
+        
+        self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
+        
+        if word_embeddings is not None:
             self.words_lookup.init_from_array(word_embeddings)
-        else:
-            self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
 
         # Char LSTM Parameters
         self.use_char_rnn = use_char_rnn
@@ -325,7 +328,7 @@ class LSTMTagger:
                 word_in_ds = word
         else:
             word_in_ds = word
-        wemb = self.words_lookup[word_in_ds]
+        wemb = dy.lookup(self.words_lookup, word_in_ds, update=self.we_update)
         if self.use_char_rnn:
             pad_char = c2i[PADDING_CHAR]
             # Note: use original casing ("word") for characters
@@ -445,6 +448,7 @@ parser.add_argument("--dropout", default=-1, dest="dropout", type=float, help="A
 parser.add_argument("--viterbi", dest="viterbi", action="store_true", help="Use viterbi training instead of CRF")
 parser.add_argument("--loss-margin", default="one", dest="loss_margin", help="Loss margin calculation method in sequence tagger (currently only supported in Viterbi). Supported values - one (default), zero, att-prop (attribute proportional)")
 parser.add_argument("--no-sequence-model", dest="no_sequence_model", action="store_true", help="Use regular LSTM tagger with no viterbi")
+parser.add_argument("--no-we-update", dest="no_we_update", action="store_true", help="Word Embeddings aren't updated")
 parser.add_argument("--loss-prop", dest="loss_prop", action="store_true", help="Proportional loss magnitudes in LSTM model")
 parser.add_argument("--use-char-rnn", dest="use_char_rnn", action="store_true", help="Use character RNN")
 parser.add_argument("--lowercase-words", dest="lowercase_words", action="store_true", help="Words are all in lowercased form (characters stay the same)")
@@ -537,6 +541,7 @@ if options.no_sequence_model:
                        num_lstm_layers=options.lstm_layers,
                        hidden_dim=options.hidden_dim,
                        word_embeddings=word_embeddings,
+                       no_we_update = options.no_we_update,
                        train_vocab_ctr=training_vocab,
                        use_char_rnn=options.use_char_rnn,
                        charset_size=len(c2i),
@@ -558,6 +563,7 @@ else:
                        options.lstm_layers,
                        options.hidden_dim,
                        word_embeddings,
+                       options.no_we_update,
                        options.use_char_rnn,
                        len(c2i),
                        training_vocab,
