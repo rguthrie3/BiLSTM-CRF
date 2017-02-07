@@ -174,18 +174,19 @@ if options.no_sequence_model:
     model = LSTMTagger(options.model_file, options.use_char_rnn)
 else:
     model = BiLSTM_CRF(options.model_file, options.use_char_rnn)
+print "Model has {} word embeddings".format(model.size())
 
 if options.embs_dict is not None:
     word_embeddings = utils.read_pretrained_embeddings(options.embs_dict, w2i)
     total_words = len(word_embeddings)
-    print "Found {} word embeddings ".format(total_words)
+    print "Init dict has {} word embeddings".format(total_words)
 else:
     if options.no_sequence_model:
-        model2 = LSTMTagger(options.model_file, options.use_char_rnn)
+        model2 = LSTMTagger(options.model_file2, options.use_char_rnn)
     else:
-        model2 = BiLSTM_CRF(options.model_file, options.use_char_rnn)
+        model2 = BiLSTM_CRF(options.model_file2, options.use_char_rnn)
     total_words = model2.size()
-    print "Found {} word embeddings ".format(total_words)
+    print "Model2 has {} word embeddings".format(total_words)
 
 unfound_words = 0
 total_same = 0
