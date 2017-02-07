@@ -202,5 +202,7 @@ for word in xrange(total_words):
         total_same += 1
 
 logging.info("Unchanged words: {} of {} = {}".format(total_same, total_words, total_same / total_words))
-logging.info("Total diff: {}".format(diff))
-print "Total diff: {}".format(diff)
+logging.info("Total diff: {}".format(total_diff))
+logging.info("Average diff: {}".format(total_diff / total_words))
+print "Total diff: {}".format(total_diff)
+print "Average diff: {}".format(total_diff / total_words)
