@@ -93,7 +93,7 @@ def wordify(instance):
 def dist(instance, vec):
     we = instance.word_emb
     if options.cosine:
-        return we.dot(vec) / (np.linalg.norm(we) * np.linalg.norm(vec))
+        return 1.0 - (we.dot(vec) / (np.linalg.norm(we) * np.linalg.norm(vec)))
     return np.linalg.norm(we - vec)
  
 # ===-----------------------------------------------------------------------===
@@ -120,16 +120,16 @@ options = parser.parse_args()
 log_dir = "embedding_train_charlstm-{}-{}".format(datetime.datetime.now().strftime('%y%m%d%H%M%S'), options.lang)
 os.mkdir(log_dir)
 
-root_logger=logging.getLogger()
+root_logger = logging.getLogger()
 root_logger.setLevel(logging.INFO)
 handler = logging.FileHandler(log_dir + '/log.txt', 'w', 'utf-8')
-formatter = logging.Formatter('%(message)s') # or whatever
+formatter = logging.Formatter('%(message)s')
 handler.setFormatter(formatter)
 root_logger.addHandler(handler)
 
-logging.info("Training dataset: {}".format(options.dataset))
-logging.info("Output vocabulary: {}".format(options.vocab))
-logging.info("Output location: {}\n".format(options.output))
+root_logger.info("Training dataset: {}".format(options.dataset))
+root_logger.info("Output vocabulary: {}".format(options.vocab))
+root_logger.info("Output location: {}\n".format(options.output))
 
 # Load training set
 dataset = cPickle.load(open(options.dataset, "r"))
@@ -147,9 +147,9 @@ with codecs.open(options.vocab, "r", "utf-8") as vocab_file:
 
 model = LSTMPredictor(options.num_lstm_layers, len(c2i), options.char_dim, options.hidden_dim, emb_dim, vocab_size=None)
 trainer = dy.MomentumSGDTrainer(model.model, options.learning_rate, 0.9, 0.1)
-logging.info("Training Algorithm: {}".format(type(trainer)))
+root_logger.info("Training Algorithm: {}".format(type(trainer)))
 
-logging.info("Number training instances: {}".format(len(training_instances)))
+root_logger.info("Number training instances: {}".format(len(training_instances)))
 
 # Create dev set
 random.shuffle(training_instances)
@@ -203,8 +203,8 @@ for epoch in xrange(epcs):
                 else: # log vocab embeddings
                     vocab_words[word] = instance.word_emb
         
-    logging.info("\n")
-    logging.info("Epoch {} complete".format(epoch + 1))
+    root_logger.info("\n")
+    root_logger.info("Epoch {} complete".format(epoch + 1))
     trainer.update_epoch(1)
     print trainer.status()
     
@@ -230,11 +230,11 @@ for epoch in xrange(epcs):
                 else: # log vocab embeddings
                     vocab_words[word] = instance.word_emb
     
-    logging.info("Train Loss: {}".format(train_loss))
-    logging.info("Dev Loss: {}".format(dev_loss))
+    root_logger.info("Train Loss: {}".format(train_loss))
+    root_logger.info("Dev Loss: {}".format(dev_loss))
 
-logging.info("\n")
-logging.info("Average norm for pre-trained in vocab: {}".format(pretrained_vec_norms / (len(training_instances) + len(dev_instances))))
+root_logger.info("\n")
+root_logger.info("Average norm for pre-trained in vocab: {}".format(pretrained_vec_norms / (len(training_instances) + len(dev_instances))))
 
 # Infer for test set
 showcase_size = 25
@@ -254,17 +254,17 @@ for idx, instance in enumerate(test_instances):
         if rand < showcase_size:
             showcase[rand] = word
     
-logging.info("Average norm for trained: {}".format(inferred_vec_norms / len(test_instances)))
+root_logger.info("Average norm for trained: {}".format(inferred_vec_norms / len(test_instances)))
 
 similar_words = {}
 for w in showcase:
-    vec = vocab_words[word]
+    vec = vocab_words[w]
     top_k = [(wordify(instance),d) for instance,d in sorted([(inst, dist(inst, vec)) for inst in training_instances], key=lambda x: x[1])[:top_to_show]]
     if options.debug:
-        print [(w,d) for i,d in top_k]
+        print w, [(i,d) for i,d in top_k]
     similar_words[w] = top_k
 
-logging.info("\nSome most-similar words from training set for a random selection of test set:\n{}".format("\n".join([k + ":\t" + " ".join([t[0] for t in v]) for k,v in similar_words.iteritems()])))
+root_logger.info("\nSome most-similar words from training set for a random selection of test set:\n{}".format("\n".join([k + ":\t" + " ".join([t[0] for t in v]) for k,v in similar_words.iteritems()])))
 
 # write all
 with codecs.open(options.output, "w", "utf-8") as writer:
