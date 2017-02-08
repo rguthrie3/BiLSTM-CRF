@@ -58,7 +58,8 @@ class LSTMPredictor:
         
         rep = dy.concatenate([bi_fwd_out[-1], bi_bwd_out[-1]])
 
-        return O * dy.tanh(H * rep + Hb) + Ob
+        #return O * dy.tanh(H * rep + Hb) + Ob
+        return O * dy.rectify(H * rep + Hb) + Ob
 
     def loss(self, observation, target_rep):
         return dy.squared_distance(observation, dy.inputVector(target_rep))
@@ -88,6 +89,12 @@ class LSTMPredictor:
 
 def wordify(instance):
     return ''.join([i2c[i] for i in instance.chars])
+    
+def dist(instance, vec):
+    we = instance.word_emb
+    if options.cosine:
+        return we.dot(vec) / (np.linalg.norm(we) * np.linalg.norm(vec))
+    return np.linalg.norm(we - vec)
  
 # ===-----------------------------------------------------------------------===
 # Argument parsing
@@ -105,13 +112,20 @@ parser.add_argument("--dropout", default=-1, dest="dropout", type=float, help="a
 parser.add_argument("--num-epochs", default=10, dest="num_epochs", type=int, help="Number of full passes through training set (default = 10)")
 parser.add_argument("--learning-rate", default=0.01, dest="learning_rate", type=float, help="Initial learning rate")
 parser.add_argument("--dynet-mem", help="Ignore this outside argument")
+parser.add_argument("--cosine", dest="cosine", action="store_true", help="Use cosine as diff measure")
 parser.add_argument("--debug", dest="debug", action="store_true", help="Debug mode")
 options = parser.parse_args()
 
 # Set up logging
 log_dir = "embedding_train_charlstm-{}-{}".format(datetime.datetime.now().strftime('%y%m%d%H%M%S'), options.lang)
 os.mkdir(log_dir)
-logging.basicConfig(filename=log_dir + "/log.txt", filemode="w", format="%(message)s", level=logging.INFO)
+
+root_logger=logging.getLogger()
+root_logger.setLevel(logging.INFO)
+handler = logging.FileHandler(log_dir + '/log.txt', 'w', 'utf-8')
+formatter = logging.Formatter('%(message)s') # or whatever
+handler.setFormatter(formatter)
+root_logger.addHandler(handler)
 
 logging.info("Training dataset: {}".format(options.dataset))
 logging.info("Output vocabulary: {}".format(options.vocab))
@@ -245,10 +259,12 @@ logging.info("Average norm for trained: {}".format(inferred_vec_norms / len(test
 similar_words = {}
 for w in showcase:
     vec = vocab_words[word]
-    top_five = [wordify(instance) for instance in sorted(training_instances, key=lambda inst:np.linalg.norm(inst.word_emb - vec))[:top_to_show]]
-    similar_words[w] = top_five
+    top_k = [(wordify(instance),d) for instance,d in sorted([(inst, dist(inst, vec)) for inst in training_instances], key=lambda x: x[1])[:top_to_show]]
+    if options.debug:
+        print [(w,d) for i,d in top_k]
+    similar_words[w] = top_k
 
-logging.info("\nSome most-similar words from training set for a random selection of test set:\n{}".format("\n".join([k + ":\t" + " ".join(v) for k,v in similar_words.iteritems()])))
+logging.info("\nSome most-similar words from training set for a random selection of test set:\n{}".format("\n".join([k + ":\t" + " ".join([t[0] for t in v]) for k,v in similar_words.iteritems()])))
 
 # write all
 with codecs.open(options.output, "w", "utf-8") as writer:
