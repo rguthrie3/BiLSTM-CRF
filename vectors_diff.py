@@ -115,6 +115,11 @@ class LSTMTagger:
     def size(self):
         return self.words_lookup.shape()[0]
 
+def dist(v1, v2):
+    if options.cosine:
+        return 1.0 - (v1.dot(v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
+    return np.linalg.norm(v1 - v2)
+
 # ===-----------------------------------------------------------------------===
 # Argument parsing
 # ===-----------------------------------------------------------------------===
@@ -127,6 +132,7 @@ parser.add_argument("--viterbi", dest="viterbi", action="store_true", help="Use 
 parser.add_argument("--no-sequence-model", dest="no_sequence_model", action="store_true", help="Use regular LSTM tagger with no viterbi")
 parser.add_argument("--pos-separate-col", default=True, dest="pos_separate_col", help="Output examples have POS in separate column")
 parser.add_argument("--use-char-rnn", dest="use_char_rnn", action="store_true", help="Use character RNN")
+parser.add_argument("--cosine", dest="cosine", action="store_true", help="Use cosine distance")
 parser.add_argument("--output", default="compare_output.txt", dest="output", help="Output location")
 parser.add_argument("--debug", dest="debug", action="store_true", help="Debug mode")
 options = parser.parse_args()
@@ -169,7 +175,6 @@ w2i = dataset["w2i"]
 # Load model
 # ===-----------------------------------------------------------------------===
 
-tag_set_sizes = { att: len(t2i) for att, t2i in dataset["t2is"].items() }
 if options.no_sequence_model:
     model = LSTMTagger(options.model_file, options.use_char_rnn)
 else:
@@ -193,9 +198,9 @@ total_same = 0
 total_diff = 0.0
 for word in xrange(total_words):
     if options.embs_dict is not None:
-        diff = np.linalg.norm(word_embeddings[word] - model.word_rep(word).npvalue())
+        diff = dist(word_embeddings[word], model.word_rep(word).npvalue())
     else:
-        diff = np.linalg.norm(model2.word_rep(word).npvalue() - model.word_rep(word).npvalue())
+        diff = dist(model2.word_rep(word).npvalue(), model.word_rep(word).npvalue())
     if diff > 0.0:
         total_diff += diff
     else:
