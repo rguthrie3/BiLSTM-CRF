@@ -1,6 +1,7 @@
 from __future__ import division
 from collections import Counter
 from evaluate_morphotags import Evaluator
+from sys import maxint
 
 import collections
 import argparse
@@ -28,10 +29,9 @@ DEFAULT_WORD_EMBEDDING_SIZE = 64
 
 class BiLSTM_CRF:
 
-    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, no_we_update, use_char_rnn, charset_size, train_vocab_ctr, margins, lowercase_words, vocab_size=None):
+    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, no_we_update, use_char_rnn, charset_size, margins, lowercase_words, vocab_size=None):
         self.model = dy.Model()
         self.tagset_sizes = tagset_sizes
-        self.train_vocab_ctr = train_vocab_ctr
         self.margins = margins
         self.we_update = not no_we_update
         self.lowercase_words = lowercase_words
@@ -270,10 +270,9 @@ class BiLSTM_CRF:
 
 class LSTMTagger:
 
-    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, no_we_update, train_vocab_ctr, use_char_rnn, charset_size, lowercase_words, att_props=None, vocab_size=None, word_embedding_dim=None):
+    def __init__(self, tagset_sizes, num_lstm_layers, hidden_dim, word_embeddings, no_we_update, use_char_rnn, charset_size, lowercase_words, att_props=None, vocab_size=None, word_embedding_dim=None):
         self.model = dy.Model()
         self.tagset_sizes = tagset_sizes
-        self.train_vocab_ctr = train_vocab_ctr
         self.attributes = tagset_sizes.keys()
         self.we_update = not no_we_update
         self.lowercase_words = lowercase_words
@@ -443,6 +442,7 @@ parser.add_argument("--word-embeddings", dest="word_embeddings", help="File from
 parser.add_argument("--num-epochs", default=20, dest="num_epochs", type=int, help="Number of full passes through training set")
 parser.add_argument("--lstm-layers", default=2, dest="lstm_layers", type=int, help="Number of LSTM layers")
 parser.add_argument("--hidden-dim", default=128, dest="hidden_dim", type=int, help="Size of LSTM hidden layers")
+parser.add_argument("--training-size", default=maxint, dest="training_size", type=int, help="Max size of training set")
 parser.add_argument("--learning-rate", default=0.01, dest="learning_rate", type=float, help="Initial learning rate")
 parser.add_argument("--dropout", default=-1, dest="dropout", type=float, help="Amount of dropout to apply to LSTM part of graph")
 parser.add_argument("--viterbi", dest="viterbi", action="store_true", help="Use viterbi training instead of CRF")
@@ -491,6 +491,7 @@ Dataset: {}
 Pretrained Embeddings: {}
 Num Epochs: {}
 LSTM: {} layers, {} hidden dim
+Training set size limit: {}
 Initial Learning Rate: {}
 Dropout: {}
 Objective: {}
@@ -498,7 +499,7 @@ Objective: {}
 Lowercasing words: {}
 
 """.format(options.dataset, options.word_embeddings, options.num_epochs, options.lstm_layers, options.hidden_dim,
-           options.learning_rate, options.dropout, objective, loss_scheme, options.lowercase_words))
+           options.training_size, options.learning_rate, options.dropout, objective, loss_scheme, options.lowercase_words))
 
 if options.debug:
     print "DEBUG MODE"
@@ -522,6 +523,10 @@ dev_instances = dataset["dev_instances"]
 dev_vocab = dataset["dev_vocab"]
 test_instances = dataset["test_instances"]
 
+# trim training set for size evaluation
+if len(training_instances) > options.training_size:
+    random.shuffle(training_instances)
+    training_instances = training_instances[:options.training_size]
 
 # ===-----------------------------------------------------------------------===
 # Build model and trainer
@@ -542,7 +547,6 @@ if options.no_sequence_model:
                        hidden_dim=options.hidden_dim,
                        word_embeddings=word_embeddings,
                        no_we_update = options.no_we_update,
-                       train_vocab_ctr=training_vocab,
                        use_char_rnn=options.use_char_rnn,
                        charset_size=len(c2i),
                        lowercase_words=options.lowercase_words,
@@ -566,7 +570,6 @@ else:
                        options.no_we_update,
                        options.use_char_rnn,
                        len(c2i),
-                       training_vocab,
                        margins,
                        options.lowercase_words,
                        vocab_size=len(w2i))
