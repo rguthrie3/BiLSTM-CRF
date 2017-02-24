@@ -118,7 +118,7 @@ def main():
     parser.add_argument("-o", dest="output", required=True, help="Output filename")
     parser.add_argument("--num-types", dest="num_types", default=50000, help="Number of unique types to preserve if doing preprocessing")
     parser.add_argument("--no-subsample", dest="do_subsample", default=True, action="store_false", help="Whether or not to subsample the text")
-    parser.add_argument("--subsample-token-count", required=True, dest="token_count", help="Total number of tokens that should be in the output")
+    parser.add_argument("--subsample-token-count", dest="token_count", help="Total number of tokens that should be in the output")
     parser.add_argument("--subsample-seq-len", dest="seq_len", default=50, help="Length of the chunks that will be sampled")
     parser.add_argument("--subsample-dont-split-on-token", required=False, dest="dont_split_on_token", help="Don't output a sequence that crosses a certain token (e.g ==END-OF-DOCUMENT==")
     parser.add_argument("--language", required=True, dest="language", help="NLTK tokenizer language")
@@ -126,10 +126,10 @@ def main():
     options = parser.parse_args()
 
     # Subsample the data
-    num_samples = int(options.token_count) / int(options.seq_len)
     seq_generator = SequenceGenerator(options.input[0], int(options.seq_len), doc_splitter, None)
 
     if options.do_subsample:
+        num_samples = int(options.token_count) / int(options.seq_len)
         sampled_data = res_sample(seq_generator, num_samples)
         print 'Done sampling'
     else:
