@@ -15,9 +15,21 @@ Inputs:
 '''
 
 POLYGLOT_UNK = unicode("<UNK>")
+W2V_UNK = unicode("UNK")
 PADDING_CHAR = "<*>"
 
 Instance = collections.namedtuple("Instance", ["chars", "word_emb"])
+
+def read_text_embs(filename):
+    words = []
+    embs = []
+    with codecs.open(filename, "r", "utf-8") as f:
+        for line in f:
+            split = line.split()
+            if len(split) > 2:
+                words.append(split[0])
+                embs.append(np.array([float(s) for s in split[1:]]))
+    return words, embs
 
 def charseq(word, c2i):
     chars = []
@@ -30,6 +42,7 @@ def charseq(word, c2i):
 # parse arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("--vectors", required=True, dest="vectors", help="Pickle file from which to get target word vectors")
+parser.add_argument("--w2v-format", dest="w2v_format", action="store_true", help="Vector file is in textual w2v format")
 parser.add_argument("--vocab", required=True, dest="vocab", help="File containing words for unlabeled test set")
 parser.add_argument("--output", required=True, dest="output", help="Output filename (.pkl)")
 
@@ -45,8 +58,11 @@ test_instances = []
 with codecs.open(options.vocab, "r", "utf-8") as f:
     vocab = set([ line.strip() for line in f ])
     
-# read embeddings file (Polyglot format assumed)
-words, embs = cPickle.load(open(options.vectors, "r"))
+# read embeddings file
+if options.w2v_format:
+    words, embs = read_text_embs(options.vectors)
+else:
+    words, embs = cPickle.load(open(options.vectors, "r"))
 dim = len(embs[0])
 word_to_ix = {w : i for (i,w) in enumerate(words)}
 
@@ -54,7 +70,7 @@ with codecs.open(options.output, "w", "utf-8") as outfile:
     in_vocab = 0
     total = len(vocab)
     for word, emb in zip(words, embs):
-        if word == POLYGLOT_UNK: continue
+        if word == POLYGLOT_UNK or word == W2V_UNK: continue
         if word in vocab:
             in_vocab += 1
         training_instances.append(Instance(charseq(word, c2i), emb))
