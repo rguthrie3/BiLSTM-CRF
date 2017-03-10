@@ -47,8 +47,6 @@ def read_file(filename, t2is, c2i, forbidden_words=[]):
                 if word in forbidden_words: continue
                 postag = data[3] if options.ud_tags else data[4]
                 morphotags = split_tagstring(data[5], uni_key=options.flat_morphotags)
-                word_seen = word in mtsets
-                keep_word = True
                 
                 # populate unseen tags and chars if exist
                 pt2i = t2is[POS_KEY]
