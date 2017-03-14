@@ -48,6 +48,8 @@ def read_file(filename, t2is, c2i, forbidden_words=[]):
                 postag = data[3] if options.ud_tags else data[4]
                 morphotags = split_tagstring(data[5], uni_key=options.flat_morphotags)
                 
+                if len(options.tags_included) > 0 and postag not in options.tags_included: continue
+                
                 # populate unseen tags and chars if exist
                 pt2i = t2is[POS_KEY]
                 if postag not in pt2i:
@@ -101,13 +103,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--training-data", required=True, dest="training_data", help="Training data .txt file")
 parser.add_argument("--dev-data", required=True, dest="dev_data", help="Development data .txt file")
 parser.add_argument("--test-data", required=True, dest="test_data", help="Test data .txt file")
+parser.add_argument("--tags-included", dest="tags_included", nargs='+', help="Which tags to include (default = all). Remember to use the --ud-tags option if filtering on UD tags")
 parser.add_argument("--ud-tags", dest="ud_tags", action="store_true", help="Extract UD tags instead of original tags")
 parser.add_argument("--flat-morphotags", dest="flat_morphotags", action="store_true", help="Morphosyntactic tags are flattened to single features")
 parser.add_argument("-o", required=True, dest="output", help="Output filename (.pkl)")
 parser.add_argument("--vocab-file", dest="vocab_file", default="vocab.txt", help="Text file containing all of the words in \
                     the train/dev/test data to use in outputting embeddings")
 options = parser.parse_args()
-
 
 t2is = defaultdict(lambda: {NONE_TAG:0}) # mapping from attribute name to mapping from tag to index
 c2i = {}
