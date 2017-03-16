@@ -26,6 +26,8 @@ DEFAULT_WORD_EMBEDDING_SIZE = 64
 DEFAULT_HIDDEN_DIM = 128
 DEFAULT_CHAR_HIDDEN_DIM = 50
 
+FLOAT_FORMAT = "{:.4f}"
+
 class MLP:
 
     def __init__(self, tagset_sizes, hidden_dim, char_hidden_dim, word_embeddings, we_update, use_char_rnn, charset_size, lowercase_words, att_props=None, vocab_size=None, word_embedding_dim=None):
@@ -215,7 +217,7 @@ Initial Learning Rate: {}
 Lowercasing words: {}
 """.format(options.dataset, options.word_embeddings, options.num_epochs, options.hidden_dim,\
                 char_rnn_dim_str, options.training_size, options.learning_rate,\
-				options.lowercase_words))
+                options.lowercase_words))
 
 if options.debug:
     print "DEBUG MODE"
@@ -324,35 +326,42 @@ for epoch in xrange(int(options.num_epochs)):
         d_instances = dev_instances[0:int(len(dev_instances)/5)]
     else:
         d_instances = dev_instances
-    with open("{}/devout_epoch-{:03d}.txt".format(options.log_dir, epoch + 1), 'w') as dev_writer:
-        for instance in bar(d_instances):
-            gold_tags = instance.tags
-            for att in model.attributes:
-                if att not in instance.tags:
-                    gold_tags[att] = [t2is[att][NONE_TAG]]
-            losses = model.loss(instance.word, gold_tags)
-            total_loss = sum([l.scalar_value() for l in losses.values()]) # TODO or average
-            out_tags_set = model.tag_word(instance.word)
-            
-            gold_string = utils.single_morphotag_string(i2ts, gold_tags)
-            obs_string = utils.single_morphotag_string(i2ts, out_tags_set)
-            f1_eval.add_instance(utils.split_tagstring(gold_string, has_pos=False),\
-                                    utils.split_tagstring(obs_string, has_pos=False))
-            for att, tags in gold_tags.items():
-                if att == POS_KEY: continue
-                out_tags = out_tags_set[att]
-                if gold_tags == out_tags:
-                    dev_correct[att] += 1
-                dev_total[att] += 1
-            
-            dev_loss += total_loss
-            dev_writer.write("\n{}\t{}\t{}".format(instance.word, gold_string, obs_string).encode('utf8'))
+    pred_strings = []
+    for instance in bar(d_instances):
+        gold_tags = instance.tags
+        for att in model.attributes:
+            if att not in instance.tags:
+                gold_tags[att] = [t2is[att][NONE_TAG]]
+        losses = model.loss(instance.word, gold_tags)
+        total_loss = sum([l.scalar_value() for l in losses.values()]) # TODO or average
+        out_tags_set = model.tag_word(instance.word)
+        
+        gold_string = utils.single_morphotag_string(i2ts, gold_tags)
+        obs_string = utils.single_morphotag_string(i2ts, out_tags_set)
+        f1_eval.add_instance(utils.split_tagstring(gold_string, has_pos=False),\
+                                utils.split_tagstring(obs_string, has_pos=False))
+        
+        # compute accuracy per attribute
+        for att, gtags in gold_tags.items():
+            if att == POS_KEY: continue
+            out_tags = out_tags_set[att]
+            if gtags == out_tags:
+				if gtags == [t2is[att][NONE_TAG]]: continue
+				dev_correct[att] += 1
+            dev_total[att] += 1
+        
+        dev_loss += total_loss
+        pred_strings.append("{}\t{}\t{}".format(instance.word, gold_string, obs_string).encode('utf8'))
+        
+    if (epoch + 1) % 50 == 0 or epoch + 1 == options.num_epochs:
+        with open("{}/devout_epoch-{:03d}.txt".format(options.log_dir, epoch + 1), 'w') as dev_writer:
+            dev_writer.write("\n".join(pred_strings) + "\n")
 
     d_acc = sum(dev_correct.values()) / sum(dev_total.values())
-    dev_accs.append(d_acc)
-    dev_mic_f1s.append(f1_eval.mic_f1())
-    logging.info("POS Dev Accuracy: {}".format(d_acc))
+    dev_accs.append(FLOAT_FORMAT.format(d_acc))
+    dev_mic_f1s.append(FLOAT_FORMAT.format(f1_eval.mic_f1()))
     for attr in t2is.keys():
+        if attr == POS_KEY: continue
         logging.info("{} F1: {}".format(attr, f1_eval.mic_f1(att = attr)))
     logging.info("Total attribute F1s: {} micro, {} macro".format(f1_eval.mic_f1(), f1_eval.mac_f1()))
     
@@ -362,13 +371,15 @@ for epoch in xrange(int(options.num_epochs)):
     logging.info("Dev Loss: {}".format(dev_loss))
     
     # Serialize model
-    if not options.debug and (epoch + 1) % 50 == 0:
+    if (epoch + 1) % 50 == 0 or epoch + 1 == options.num_epochs:
         new_model_file_name = "{}/model_epoch-{:03d}.bin".format(options.log_dir, epoch + 1)
         logging.info("Saving model to {}".format(new_model_file_name))
         model.save(new_model_file_name) # TODO also save non-internal model stuff like mappings
 
-logging.info("Dev accuracies: {}", ",".join(dev_accs))
-logging.info("Dev Micro F1s: {}", ",".join(dev_mic_f1s))
+logging.info("Dev accuracies:\t{}".format("\t".join(dev_accs)))
+logging.info("Dev Micro F1s:\t{}".format("\t".join(dev_mic_f1s)))
+print "Final accuracy: {}".format(dev_accs[-1])
+print "Final Micro F1: {}".format(dev_mic_f1s[-1])
 
 exit()
 
