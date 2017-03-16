@@ -87,9 +87,11 @@ def read_file(filename, t2is, c2i, forbidden_words=[]):
                 
     instances = []
     multitag_wordatts = 0
+    conflicted_words = 0
     # if needed, w2i can be created here.
     for w,d in mtsets.iteritems():
         if DONT_KEEP in d:
+            conflicted_words += 1
             continue
         tags = {}
         for att,val_set in d.iteritems():
@@ -97,7 +99,8 @@ def read_file(filename, t2is, c2i, forbidden_words=[]):
             if len(val_set) > 1:
                 multitag_wordatts += 1
         instances.append(Instance(w, tags))
-    print "{} word-attributes with multiple tags".format(multitag_wordatts)
+    print "For {} words, {} were conflicted and {} had legal attributes with multiple tags"\
+                                        .format(len(mtsets), conflicted_words, multitag_wordatts)
     return instances, mtsets.keys()
     
 parser = argparse.ArgumentParser()
