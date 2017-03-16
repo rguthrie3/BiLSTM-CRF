@@ -124,6 +124,9 @@ class MLP:
         errors = {}
         for att, vals in tags.iteritems():
             if att == POS_KEY: continue
+            if len(vals) == 0:
+                print word, att
+                exit()
             err = dy.esum([dy.pickneglogsoftmax(obss[att], v) for v in vals])
             if self.att_props is not None:
                 prop_vec = dy.inputVector([self.att_props[att]])
@@ -294,7 +297,7 @@ for epoch in xrange(int(options.num_epochs)):
     for idx,instance in enumerate(bar(train_instances)):
         gold_tags = instance.tags
         for att in model.attributes:
-            if att not in instance.tags:
+            if att not in instance.tags or len(instance.tags[att]) == 0:
                 gold_tags[att] = [t2is[att][NONE_TAG]]
         loss_exprs = model.loss(instance.word, gold_tags)
         loss_expr = dy.esum(loss_exprs.values())
@@ -330,7 +333,7 @@ for epoch in xrange(int(options.num_epochs)):
     for instance in bar(d_instances):
         gold_tags = instance.tags
         for att in model.attributes:
-            if att not in instance.tags:
+            if att not in instance.tags or len(instance.tags[att]) == 0:
                 gold_tags[att] = [t2is[att][NONE_TAG]]
         losses = model.loss(instance.word, gold_tags)
         total_loss = sum([l.scalar_value() for l in losses.values()]) # TODO or average
@@ -346,8 +349,8 @@ for epoch in xrange(int(options.num_epochs)):
             if att == POS_KEY: continue
             out_tags = out_tags_set[att]
             if gtags == out_tags:
-				if gtags == [t2is[att][NONE_TAG]]: continue
-				dev_correct[att] += 1
+                if gtags == [t2is[att][NONE_TAG]]: continue
+                dev_correct[att] += 1
             dev_total[att] += 1
         
         dev_loss += total_loss
