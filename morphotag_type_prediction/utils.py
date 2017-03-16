@@ -34,7 +34,7 @@ def split_tagstring(s, uni_key=False, has_pos=False):
     '''
     Returns attribute-value mapping from UD-type CONLL field
     @param uni_key: if toggled, returns attribute-values pairs as joined strings (with the '=').
-	    "values", separated by comma, are a *set*.
+        "values", separated by comma, are a *set*.
     '''
     if has_pos:
         s = s.split("\t")[1]
@@ -51,26 +51,15 @@ def split_tagstring(s, uni_key=False, has_pos=False):
     return ret
 
 
-def morphotag_strings(i2ts, tag_mapping, pos_separate_col=True):
-    senlen = len(tag_mapping.values()[0])
-    key_value_strs = []
-    
-    # j iterates along sentence, as we're building the string representations
-    # in the opposite orientation as the mapping
-    for j in xrange(senlen): 
-        place_strs = []
-        for att, seq in tag_mapping.items():
-            vals = i2ts[att][seq[j]]
-            if pos_separate_col and att == POS_KEY:
-                pos_str = vals
-            elif val != NONE_TAG:
-                place_strs.append(att + "=" + ",".join(vals))
-        morpho_str = "|".join(sorted(place_strs))
-        if pos_separate_col:
-            key_value_strs.append(pos_str + "\t" + morpho_str)
-        else:
-            key_value_strs.append(morpho_str)
-    return key_value_strs
+def single_morphotag_string(i2ts, tag_mapping):
+    place_strs = []
+    for att, ivals in tag_mapping.items():
+        vals = [i2ts[att][j] for j in ivals]
+        if vals[0] != NONE_TAG:
+            place_strs.append(att + "=" + ",".join(vals))
+    morpho_str = "|".join(sorted(place_strs))
+    return morpho_str
+
 
 def sortvals(dct):
     return [v for (k,v) in sorted(dct.items())]
