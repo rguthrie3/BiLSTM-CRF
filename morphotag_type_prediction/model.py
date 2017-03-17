@@ -165,6 +165,13 @@ class MLP:
         return self.model
 
 
+def totable(params, row_headers):
+    dy.renew_cg()
+    np_params = dy.parameter(params).npvalue()
+    return "\n".join([header + "\t" + "\t".join([FLOAT_FORMAT.format(cell) for cell in row])\
+                    for header, row in zip(row_headers, np_params)])
+    
+
 def get_att_prop(instances):
     logging.info("Calculating attribute proportions for proportional loss margin or proportional loss magnitude")
     att_counts = Counter()
@@ -282,6 +289,8 @@ logging.info("Number dev instances: {}".format(len(dev_instances)))
 
 dev_accs = []
 dev_mic_f1s = []
+train_losses = []
+dev_losses = []
 for epoch in xrange(int(options.num_epochs)):
     bar = progressbar.ProgressBar()
     random.shuffle(training_instances)
@@ -370,8 +379,8 @@ for epoch in xrange(int(options.num_epochs)):
     
     train_loss = train_loss / len(train_instances)
     dev_loss = dev_loss / len(d_instances)
-    logging.info("Train Loss: {}".format(train_loss))
-    logging.info("Dev Loss: {}".format(dev_loss))
+    train_losses.append(FLOAT_FORMAT.format(train_loss))
+    dev_losses.append(FLOAT_FORMAT.format(dev_loss))
     
     # Serialize model
     if (epoch + 1) % 50 == 0 or epoch + 1 == options.num_epochs:
@@ -379,10 +388,22 @@ for epoch in xrange(int(options.num_epochs)):
         logging.info("Saving model to {}".format(new_model_file_name))
         model.save(new_model_file_name) # TODO also save non-internal model stuff like mappings
 
+logging.info("Train losses:\t{}".format("\t".join(train_losses)))
+logging.info("Dev losses:\t{}".format("\t".join(dev_losses)))
 logging.info("Dev accuracies:\t{}".format("\t".join(dev_accs)))
 logging.info("Dev Micro F1s:\t{}".format("\t".join(dev_mic_f1s)))
 print "Final accuracy: {}".format(dev_accs[-1])
 print "Final Micro F1: {}".format(dev_mic_f1s[-1])
+
+with open("{}/params.txt".format(options.log_dir),"w") as weights_file:
+    weights_file.write("Hidden layer:\n")
+    weights_file.write(totable(model.emb_to_hidden_params,\
+                    ["{:3d}".format(i) for i in xrange(model.emb_to_hidden_params.shape()[0])]) + "\n")
+    for att in t2is.keys():
+        if att == POS_KEY: continue
+        weights_file.write("{}:\n".format(att))
+        weights_file.write(totable(model.hidden_to_atts_params[att],\
+                    [i2ts[att][i] for i in xrange(len(t2is[att]))]) + "\n")
 
 exit()
 
