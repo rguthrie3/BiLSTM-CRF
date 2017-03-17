@@ -165,10 +165,16 @@ class MLP:
         return self.model
 
 
-def totable(params, row_headers):
+def nums(until):
+    return ["{:3d}".format(i) for i in xrange(until)]
+
+    
+def totable(params, row_headers, display_norm=True):
     dy.renew_cg()
     np_params = dy.parameter(params).npvalue()
-    return "\n".join([header + "\t" + "\t".join([FLOAT_FORMAT.format(cell) for cell in row])\
+    return "\n".join([header + "\t" + \
+                    ((FLOAT_FORMAT.format(np.linalg.norm(row)) + "\t") if display_norm else "") + \
+                    "\t".join([FLOAT_FORMAT.format(cell) for cell in row]) \
                     for header, row in zip(row_headers, np_params)])
     
 
@@ -396,12 +402,13 @@ print "Final accuracy: {}".format(dev_accs[-1])
 print "Final Micro F1: {}".format(dev_mic_f1s[-1])
 
 with open("{}/params.txt".format(options.log_dir),"w") as weights_file:
-    weights_file.write("Hidden layer:\n")
+    hldim = options.hidden_dim
+    weights_file.write("Hidden layer:\tnorm\t{}\n".format("\t".join(nums(model.emb_to_hidden_params.shape()[1]))))
     weights_file.write(totable(model.emb_to_hidden_params,\
-                    ["{:3d}".format(i) for i in xrange(model.emb_to_hidden_params.shape()[0])]) + "\n")
+                    nums(hldim)) + "\n")
     for att in t2is.keys():
         if att == POS_KEY: continue
-        weights_file.write("{}:\n".format(att))
+        weights_file.write("{}:\tnorm\t{}\n".format(att,"\t".join(nums(hldim))))
         weights_file.write(totable(model.hidden_to_atts_params[att],\
                     [i2ts[att][i] for i in xrange(len(t2is[att]))]) + "\n")
 
