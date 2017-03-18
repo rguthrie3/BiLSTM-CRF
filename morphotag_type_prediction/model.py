@@ -34,6 +34,7 @@ class MLP:
         self.model = dy.Model()
         self.tagset_sizes = tagset_sizes
         self.attributes = tagset_sizes.keys()
+        self.hidden_dim = hidden_dim
         self.we_update = we_update
         self.lowercase_words = lowercase_words
         if att_props is not None:
@@ -63,13 +64,17 @@ class MLP:
             input_dim = word_embedding_dim
 
         # Matrix that maps from embeddings to num tags
-        self.emb_to_hidden_params = self.model.add_parameters((hidden_dim, input_dim))
-        self.emb_to_hidden_bias = self.model.add_parameters(hidden_dim)
-        self.hidden_to_atts_params = {}
-        self.hidden_to_atts_bias = {}
+        if hidden_dim > 0:
+            self.emb_to_hidden_params = self.model.add_parameters((hidden_dim, input_dim))
+            self.emb_to_hidden_bias = self.model.add_parameters(hidden_dim)
+            penult_dim = hidden_dim
+        else:
+            penult_dim = input_dim
+        self.output_layer_params = {}
+        self.output_layer_bias = {}
         for att, set_size in tagset_sizes.items():
-            self.hidden_to_atts_params[att] = self.model.add_parameters((set_size, hidden_dim))
-            self.hidden_to_atts_bias[att] = self.model.add_parameters(set_size)
+            self.output_layer_params[att] = self.model.add_parameters((set_size, penult_dim))
+            self.output_layer_bias[att] = self.model.add_parameters(set_size)
 
 
     def word_rep(self, word):
@@ -100,21 +105,23 @@ class MLP:
         dy.renew_cg()
 
         embedding = self.word_rep(word)
-
+        
+        # hidden layer computation
+        if self.hidden_dim > 0:
+            H = dy.parameter(self.emb_to_hidden_params)
+            Hb = dy.parameter(self.emb_to_hidden_bias)
+            penult_res = dy.tanh(H * embedding + Hb)
+        else:
+            penult_res = embedding
+        
+        # per-attribute computation
         O = {}
         Ob = {}
         scores = {}
-        
-        # hidden layer computation
-        H = dy.parameter(self.emb_to_hidden_params)
-        Hb = dy.parameter(self.emb_to_hidden_bias)
-        hidden_res = dy.tanh(H * embedding + Hb)
-        
-        # per-attribute computation
         for att in self.attributes:
-            O[att] = dy.parameter(self.hidden_to_atts_params[att])
-            Ob[att] = dy.parameter(self.hidden_to_atts_bias[att])
-            scores[att] = O[att] * hidden_res + Ob[att]
+            O[att] = dy.parameter(self.output_layer_params[att])
+            Ob[att] = dy.parameter(self.output_layer_bias[att])
+            scores[att] = O[att] * penult_res + Ob[att]
 
         return scores
 
@@ -150,11 +157,12 @@ class MLP:
         members_to_save.append(self.words_lookup)
         if (self.use_char_rnn):
             members_to_save.append(self.char_lookup)
-            members_to_save.append(self.char_bi_lstm)           
-        members_to_save.append(self.emb_to_hidden_params)
-        members_to_save.append(self.emb_to_hidden_bias)
-        members_to_save.extend(utils.sortvals(self.hidden_to_atts_params))
-        members_to_save.extend(utils.sortvals(self.hidden_to_atts_bias))
+            members_to_save.append(self.char_bi_lstm)    
+        if self.hidden_dim > 0:
+            members_to_save.append(self.emb_to_hidden_params)
+            members_to_save.append(self.emb_to_hidden_bias)
+        members_to_save.extend(utils.sortvals(self.output_layer_params))
+        members_to_save.extend(utils.sortvals(self.output_layer_bias))
         self.model.save(file_name, members_to_save)
         
         with open(file_name + "-atts", 'w') as attdict:
@@ -402,85 +410,15 @@ print "Final accuracy: {}".format(dev_accs[-1])
 print "Final Micro F1: {}".format(dev_mic_f1s[-1])
 
 with open("{}/params.txt".format(options.log_dir),"w") as weights_file:
-    hldim = options.hidden_dim
-    weights_file.write("Hidden layer:\tnorm\t{}\n".format("\t".join(nums(model.emb_to_hidden_params.shape()[1]))))
-    weights_file.write(totable(model.emb_to_hidden_params,\
-                    nums(hldim)) + "\n")
+    if options.hidden_dim > 0:
+        pldim = options.hidden_dim
+        weights_file.write("Hidden layer:\tnorm\t{}\n".format("\t".join(nums(model.emb_to_hidden_params.shape()[1]))))
+        weights_file.write(totable(model.emb_to_hidden_params,\
+                    nums(pldim)) + "\n")
+    else:
+        pldim = DEFAULT_WORD_EMBEDDING_SIZE
     for att in t2is.keys():
         if att == POS_KEY: continue
-        weights_file.write("{}:\tnorm\t{}\n".format(att,"\t".join(nums(hldim))))
-        weights_file.write(totable(model.hidden_to_atts_params[att],\
+        weights_file.write("{}:\tnorm\t{}\n".format(att,"\t".join(nums(pldim))))
+        weights_file.write(totable(model.output_layer_params[att],\
                     [i2ts[att][i] for i in xrange(len(t2is[att]))]) + "\n")
-
-exit()
-
-####################################################
-#### TODO re-write test part, make easy outputs ####
-####################################################
-
-# Evaluate test data (once)
-logging.info("\n")
-logging.info("Number test instances: {}".format(len(test_instances)))
-test_correct = Counter()
-test_total = Counter()
-test_oov_total = Counter()
-bar = progressbar.ProgressBar()
-total_wrong = Counter()
-total_wrong_oov = Counter()
-f1_eval = Evaluator(m = 'att')
-if options.debug:
-    t_instances = test_instances[0:int(len(test_instances)/10)]
-else:
-    t_instances = test_instances
-with open("{}/testout.txt".format(options.log_dir), 'w') as test_writer:
-    for instance in bar(t_instances):
-        if len(instance.sentence) == 0: continue
-        if options.no_sequence_model:
-            gold_tags = instance.tags
-            for att in model.attributes:
-                if att not in instance.tags:
-                    gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
-            out_tags_set = model.tag_sentence(instance.sentence)
-        else:
-            gold_tags = instance.tags
-            for att in model.attributes:
-                if att not in instance.tags:
-                    gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
-            _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags, use_margins=False)
-            
-        gold_strings = utils.single_morphotag_string(i2ts, gold_tags)
-        obs_strings = utils.single_morphotag_string(i2ts, out_tags_set)
-        for g, o in zip(gold_strings, obs_strings):
-            f1_eval.add_instance(utils.split_tagstring(g, has_pos=True), utils.split_tagstring(o, has_pos=True))
-        for att, tags in gold_tags.items():
-            out_tags = out_tags_set[att]
-
-            oov_strings = []
-            for word, gold, out in zip(instance.sentence, tags, out_tags):
-                if gold == out:
-                    test_correct[att] += 1
-                else:
-                    # Got the wrong tag
-                    total_wrong[att] += 1
-                    if i2w[word] not in training_vocab:
-                        total_wrong_oov[att] += 1
-                        oov_strings.append("OOV")
-                    else:
-                        oov_strings.append("")
-                
-                if i2w[word] not in training_vocab:
-                    test_oov_total[att] += 1
-            test_total[att] += len(tags)
-        test_writer.write(("\n"
-                         + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
-                                                                     gold_strings, obs_strings, oov_strings)])
-                         + "\n").encode('utf8'))
-        
-
-logging.info("POS Test Accuracy: {}".format(test_correct[POS_KEY] / test_total[POS_KEY]))
-for attr in t2is.keys():
-    if attr != POS_KEY:
-        logging.info("{} F1: {}".format(attr, f1_eval.mic_f1(att = attr)))
-logging.info("Total attribute F1s: {} micro, {} macro, POS included = {}".format(f1_eval.mic_f1(), f1_eval.mac_f1(), not options.pos_separate_col))
-
-logging.info("Total test tokens: {}, Total test OOV: {}, % OOV: {}".format(test_total[POS_KEY], test_oov_total[POS_KEY], test_oov_total[POS_KEY] / test_total[POS_KEY]))

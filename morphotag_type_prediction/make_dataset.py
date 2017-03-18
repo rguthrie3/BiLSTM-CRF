@@ -47,7 +47,7 @@ def read_file(filename, t2is, c2i, forbidden_words=[]):
                 if len(options.tags_included) > 0 and postag not in options.tags_included: continue
                 
                 word = data[1]
-                if not postag.startswith("PR"): word = word.lower()
+                if not postag.startswith("PR"): word = word.lower() # lowercase all but proper names
                 if word in forbidden_words: continue
                 morphotags = split_tagstring(data[5], uni_key=options.flat_morphotags)
                 
