@@ -406,8 +406,8 @@ logging.info("Train losses:\t{}".format("\t".join(train_losses)))
 logging.info("Dev losses:\t{}".format("\t".join(dev_losses)))
 logging.info("Dev accuracies:\t{}".format("\t".join(dev_accs)))
 logging.info("Dev Micro F1s:\t{}".format("\t".join(dev_mic_f1s)))
-print "Final accuracy: {}".format(dev_accs[-1])
-print "Final Micro F1: {}".format(dev_mic_f1s[-1])
+print "Final accuracy: {} (first epoch: {})".format(dev_accs[-1], dev_accs[0])
+print "Final Micro F1: {} (first epoch: {})".format(dev_mic_f1s[-1], dev_mic_f1s[0])
 
 with open("{}/params.txt".format(options.log_dir),"w") as weights_file:
     if options.hidden_dim > 0:
