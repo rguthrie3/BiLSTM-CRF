@@ -362,8 +362,8 @@ for epoch in xrange(int(options.num_epochs)):
         total_loss = sum([l.scalar_value() for l in losses.values()]) # TODO or average
         out_tags_set = model.tag_word(instance.word)
         
-        gold_string = utils.single_morphotag_string(i2ts, gold_tags)
-        obs_string = utils.single_morphotag_string(i2ts, out_tags_set)
+        gold_string = utils.single_morphotag_string(i2ts, gold_tags).encode('utf8')
+        obs_string = utils.single_morphotag_string(i2ts, out_tags_set).encode('utf8')
         f1_eval.add_instance(utils.split_tagstring(gold_string, has_pos=False),\
                                 utils.split_tagstring(obs_string, has_pos=False))
         
@@ -377,7 +377,7 @@ for epoch in xrange(int(options.num_epochs)):
             dev_total[att] += 1
         
         dev_loss += total_loss
-        pred_strings.append("{}\t{}\t{}".format(instance.word, gold_string, obs_string).encode('utf8'))
+        pred_strings.append("{}\t{}\t{}".format(instance.word.encode('utf8'), gold_string, obs_string))
         
     if (epoch + 1) % 50 == 0 or epoch + 1 == options.num_epochs:
         with open("{}/devout_epoch-{:03d}.txt".format(options.log_dir, epoch + 1), 'w') as dev_writer:
