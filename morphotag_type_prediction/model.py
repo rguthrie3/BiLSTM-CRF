@@ -1,5 +1,5 @@
 from __future__ import division
-from collections import Counter
+from collections import Counter, defaultdict
 from evaluate_morphotags import Evaluator
 from sys import maxint
 
@@ -38,7 +38,7 @@ class MLP:
         self.we_update = we_update
         self.lowercase_words = lowercase_words
         if att_props is not None:
-            self.att_props = {att:(1.0-p) for att,p in att_props.iteritems()}
+            self.att_props = defaultdict(float,{att:(1.0-p) for att,p in att_props.iteritems()})
         else:
             self.att_props = None
         
