@@ -456,6 +456,7 @@ parser.add_argument("--lowercase-words", dest="lowercase_words", action="store_t
 parser.add_argument("--semi-supervised", dest="semi_supervised", action="store_true", help="Add KL-div term")
 parser.add_argument("--kl-weight", default=1000, dest="kl_weight", type=float, help="Weight of KL-divergence term")
 parser.add_argument("--log-dir", default="log", dest="log_dir", help="Directory where to write logs / serialized models")
+parser.add_argument("--no-model", dest="no_model", action="store_true", help="Don't serialize models")
 parser.add_argument("--pos-separate-col", default=True, dest="pos_separate_col", help="Output examples have POS in separate column")
 parser.add_argument("--dynet-mem", help="Ignore this outside argument")
 parser.add_argument("--debug", dest="debug", action="store_true", help="Debug mode")
@@ -753,8 +754,12 @@ for epoch in xrange(int(options.num_epochs)):
                              + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
                                                                          gold_strings, obs_strings, oov_strings)])
                              + "\n").encode('utf8'))
-            
 
+
+    train_loss = train_loss / len(train_instances)
+    dev_loss = dev_loss / len(d_instances)
+    
+    # logging this epoch
     if options.viterbi:
         logging.info("POS Train Accuracy: {}".format(train_correct[POS_KEY] / train_total[POS_KEY]))
     logging.info("POS Dev Accuracy: {}".format(dev_correct[POS_KEY] / dev_total[POS_KEY]))
@@ -768,14 +773,12 @@ for epoch in xrange(int(options.num_epochs)):
 
     logging.info("Total dev tokens: {}, Total dev OOV: {}, % OOV: {}".format(dev_total[POS_KEY], dev_oov_total[POS_KEY], dev_oov_total[POS_KEY] / dev_total[POS_KEY]))
     
-    train_loss = train_loss / len(train_instances)
-    dev_loss = dev_loss / len(d_instances)
     logging.info("Train Loss: {}".format(train_loss))
     logging.info("Dev Loss: {}".format(dev_loss))
     train_dev_cost.add_column([train_loss, dev_loss])
     
     # Serialize model
-    if not options.debug:
+    if not options.no_model:
         new_model_file_name = "{}/model_epoch-{:02d}.bin".format(options.log_dir, epoch + 1)
         logging.info("Saving model to {}".format(new_model_file_name))
         model.save(new_model_file_name) # TODO also save non-internal model stuff like mappings
