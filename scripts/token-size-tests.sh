@@ -1,0 +1,1 @@
+python model.py --dataset results/${1}_mtags-dd.pkl --token-size $2 --word-embeddings data/embs/${1}_polyglot_vectors_ud.txt --log-dir log-${1}-$2-noseq-pginit-05dr-$3 --dropout 0.5 --no-sequence-model --num-epochs 40 --no-model
