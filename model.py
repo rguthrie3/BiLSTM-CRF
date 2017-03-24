@@ -442,7 +442,8 @@ parser.add_argument("--word-embeddings", dest="word_embeddings", help="File from
 parser.add_argument("--num-epochs", default=20, dest="num_epochs", type=int, help="Number of full passes through training set")
 parser.add_argument("--lstm-layers", default=2, dest="lstm_layers", type=int, help="Number of LSTM layers")
 parser.add_argument("--hidden-dim", default=128, dest="hidden_dim", type=int, help="Size of LSTM hidden layers")
-parser.add_argument("--training-size", default=maxint, dest="training_size", type=int, help="Max size of training set")
+parser.add_argument("--training-sentence-size", default=maxint, dest="training_sentence_size", type=int, help="Instance count of training set")
+parser.add_argument("--token-size", default=maxint, dest="token_size", type=int, help="Token count of training set")
 parser.add_argument("--learning-rate", default=0.01, dest="learning_rate", type=float, help="Initial learning rate")
 parser.add_argument("--dropout", default=-1, dest="dropout", type=float, help="Amount of dropout to apply to LSTM part of graph")
 parser.add_argument("--viterbi", dest="viterbi", action="store_true", help="Use viterbi training instead of CRF")
@@ -491,7 +492,7 @@ Dataset: {}
 Pretrained Embeddings: {}
 Num Epochs: {}
 LSTM: {} layers, {} hidden dim
-Training set size limit: {}
+Training set size limit: {} sentences or {} tokens
 Initial Learning Rate: {}
 Dropout: {}
 Objective: {}
@@ -499,7 +500,7 @@ Objective: {}
 Lowercasing words: {}
 
 """.format(options.dataset, options.word_embeddings, options.num_epochs, options.lstm_layers, options.hidden_dim,
-           options.training_size, options.learning_rate, options.dropout, objective, loss_scheme, options.lowercase_words))
+           options.training_sentence_size, options.token_size, options.learning_rate, options.dropout, objective, loss_scheme, options.lowercase_words))
 
 if options.debug:
     print "DEBUG MODE"
@@ -523,10 +524,22 @@ dev_instances = dataset["dev_instances"]
 dev_vocab = dataset["dev_vocab"]
 test_instances = dataset["test_instances"]
 
-# trim training set for size evaluation
-if len(training_instances) > options.training_size:
+# trim training set for size evaluation (sentence based)
+if len(training_instances) > options.training_sentence_size:
     random.shuffle(training_instances)
-    training_instances = training_instances[:options.training_size]
+    training_instances = training_instances[:options.training_sentence_size]
+    
+# trim training set for size evaluation (token based)
+training_corpus_size = sum(training_vocab.values())
+if training_corpus_size > options.token_size:
+    random.shuffle(training_instances)
+    cumulative_tokens = 0
+    cutoff_index = -1
+    for i,inst in enumerate(training_instances):
+        cumulative_tokens += len(inst.sentence)
+        if cumulative_tokens >= options.token_size:
+            training_instances = training_instances[:i+1]
+            break
 
 # ===-----------------------------------------------------------------------===
 # Build model and trainer
