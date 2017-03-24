@@ -17,7 +17,7 @@ def getlines(file, attr):
     for n,(i,a) in enumerate(attribute_table_starts):
         if a == attr:
             dls = data_lines[i:attribute_table_starts[n+1][0]]
-            dls[1:].sort() # TODO: do the sorting in model.py
+            dls.sort(key = lambda x:":" in x or x[0].lower()) # TODO: do the sorting in model.py
             return dls
 
                 
@@ -26,11 +26,13 @@ if __name__ == "__main__":
     log_dir = sys.argv[1]
     wanted_attr = sys.argv[2]
 
-    gender_lines = getlines("logs/{}/params.txt".format(log_dir), wanted_attr)
-
-    df = DataFrame([[float(s) for s in l.strip().split("\t")[2:]] for l in gender_lines[1:]],\
-        index=[l.split("\t")[0] for l in gender_lines[1:]],\
-        columns=gender_lines[0].strip().split("\t")[2:])
+    attr_lines = getlines("logs/{}/params.txt".format(log_dir), wanted_attr)
+    row_labels = [l.split("\t")[0] for l in attr_lines[1:]]
+    col_labels = attr_lines[0].strip().split("\t")[2:]
+    data = [[float(s) for s in l.strip().split("\t")[2:2+len(col_labels)]]\
+            for l in attr_lines[1:]]
+    
+    df = DataFrame(data, index=row_labels, columns=col_labels)
 
     vals = np.around(df.values,2)
     norm = colors.Normalize(vmin = vals.min()-0.1, vmax = vals.max()+0.1)
