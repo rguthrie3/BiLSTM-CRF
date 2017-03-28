@@ -263,9 +263,7 @@ for w in showcase:
     if options.debug:
         print w, [(i,d) for i,d in top_k]
     similar_words[w] = top_k
-
-root_logger.info("\nSome most-similar words from training set for a random selection of test set:\n{}".format("\n".join([k + ":\t" + " ".join([t[0] for t in v]) for k,v in similar_words.iteritems()])))
-
+	
 # write all
 with codecs.open(options.output, "w", "utf-8") as writer:
     for vw, emb in vocab_words.iteritems():
@@ -273,3 +271,7 @@ with codecs.open(options.output, "w", "utf-8") as writer:
         for i in emb:
             writer.write(str(i) + " ")
         writer.write("\n")
+
+# TODO save model
+
+#root_logger.info("\nSome most-similar words from training set for a random selection of test set:\n{}".format("\n".join([k + ":\t" + " ".join([t[0] for t in v]) for k,v in similar_words.iteritems()])))
