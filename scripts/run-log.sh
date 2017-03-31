@@ -1,5 +1,6 @@
 # 3/24, starting token-size ablation experiments
-parallel ./token-size-tests.sh hu $1 $2 :::: sizes-hu samples
+parallel ./token-size-tests-pg.sh hu $1 $2 :::: sh-params/sizes-hu sh-params/samples
+parallel ./token-size-tests-pg-tagchar.sh hu $1 $2 :::: sh-params/sizes-hu sh-params/samples
 
 # Older runs:
 
