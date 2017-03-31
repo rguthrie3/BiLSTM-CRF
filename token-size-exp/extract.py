@@ -18,6 +18,12 @@ def dev_mic_att_acc(line_batch):
 def test_mic_att_acc(line_batch):
     return float(line_batch[4].strip().split()[3])
 
+def dev_mac_att_acc(line_batch):
+    return float(line_batch[3].strip().split()[5])
+
+def test_mac_att_acc(line_batch):
+    return float(line_batch[4].strip().split()[5])
+
 def dev_pos_oov_acc(line_batch):
     return float(line_batch[5].strip().split()[-1])
 
@@ -26,12 +32,20 @@ def test_pos_oov_acc(line_batch):
 
 # langs = ['da', 'en', 'hu', 'it', 'lv', 'tr', 'vi']
 # langs = ['ta', 'fa', 'ru', 'sv', 'he', 'bg', 'hi', 'cs', 'es']
-langs = ['ta', 'fa', 'ru', 'sv', 'he', 'bg']
+# langs = ['ta', 'fa', 'ru', 'sv', 'he', 'bg']
+# langs = "hu tr da it lv ru sv bg en".split()
+# langs = "hu da lv en".split()
+langs = "hi cs es".split()
+# models = ['nochar-nolc','tagchar-nolc','mchar','bothchar']
 models = ['nochar','tagchar','mchar','bothchar']
+# models = ['nochar','tagchar','mbochar','bothbochar']
 
-#oov = True
+oov=False
+# oov = True
+# added="-lcbo"
+added=""
 
-with open('pg-summary{}-{}.txt'.format("-oov" if oov else "", "-".join(langs)),'w') as sum_file:
+with open('pg-summary{}{}-{}.txt'.format("-oov" if oov else "", added, "-".join(langs)),'w') as sum_file:
     for lg in langs:
         dev_pos_acc_averages = {}
         dev_pos_oov_acc_averages = {}
@@ -59,7 +73,7 @@ with open('pg-summary{}-{}.txt'.format("-oov" if oov else "", "-".join(langs)),'
                 dev_pos_accs = []
                 dev_pos_oov_accs = []
                 dev_att_f1s = []
-                # TODO add test
+                # TODO add test, macro f1s
                 
                 for b in res_batches:
                     tl = title_line(b)
