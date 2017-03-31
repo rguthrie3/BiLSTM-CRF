@@ -63,6 +63,7 @@ if options.polyglot or options.w2v:
                 embed = embs[word_to_ix[word]]
                 output_word_vector(orig_word, embed, outfile)
                 in_vocab += 1
+            elif options.in_vocab_only: continue
             else:
                 embed = embs[word_to_ix[unk_emb]]
                 output_word_vector(orig_word, embed, outfile)
