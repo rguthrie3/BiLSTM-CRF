@@ -208,7 +208,7 @@ for epoch in xrange(epcs):
     trainer.update_epoch(1)
     print trainer.status()
     
-    # Evaluate dev data (remember it's not the same set each epoch)
+    # Evaluate dev data
     model.disable_dropout()
     dev_loss = 0.0
     dev_correct = Counter()
