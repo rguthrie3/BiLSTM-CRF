@@ -35,17 +35,24 @@ def test_pos_oov_acc(line_batch):
 # langs = ['ta', 'fa', 'ru', 'sv', 'he', 'bg']
 # langs = "hu tr da it lv ru sv bg en".split()
 # langs = "hu da lv en".split()
-langs = "hi cs es".split()
+# langs = "hi cs es".split()
+# langs = ["lv"]
+langs = ["en"]
 # models = ['nochar-nolc','tagchar-nolc','mchar','bothchar']
-models = ['nochar','tagchar','mchar','bothchar']
+# models = ['nochar','tagchar','mchar','bothchar']
+# models = ['mchar','bothchar']
+models = ['nochar','tagchar']
 # models = ['nochar','tagchar','mbochar','bothbochar']
 
-oov=False
-# oov = True
+# oov=False
+oov = True
 # added="-lcbo"
+# added="-alllstm"
 added=""
+emb_algo = "ft"
+# emb_algo = "pg"
 
-with open('pg-summary{}{}-{}.txt'.format("-oov" if oov else "", added, "-".join(langs)),'w') as sum_file:
+with open('{}-summary{}{}-{}.txt'.format(emb_algo, "-oov" if oov else "", added, "-".join(langs)),'w') as sum_file:
     for lg in langs:
         dev_pos_acc_averages = {}
         dev_pos_oov_acc_averages = {}
@@ -54,7 +61,7 @@ with open('pg-summary{}{}-{}.txt'.format("-oov" if oov else "", added, "-".join(
         dev_pos_oov_acc_stddevs = {}
         dev_att_f1_stddevs = {}
         for m in models:
-            with open('results-{}-pg-{}.txt'.format(lg, m), 'r') as res_file:
+            with open('results-{}-{}{}-{}.txt'.format(lg, emb_algo, added, m), 'r') as res_file:
                 lines = res_file.readlines()
                 res_batches = [lines[i:i+LOGSUM_LEN] for i in xrange(0, len(lines), LOGSUM_LEN)]
                 
