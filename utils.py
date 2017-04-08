@@ -86,7 +86,7 @@ def read_pretrained_embeddings(filename, w2i):
     with codecs.open(filename, "r", "utf-8") as f:
         for line in f:
             split = line.split()
-            if len(split) > 0:
+            if len(split) > 2:
                 word = split[0]
                 vec = split[1:]
                 word_to_embed[word] = vec
