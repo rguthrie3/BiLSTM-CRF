@@ -108,11 +108,12 @@ parser.add_argument("--char-dim", default=DEFAULT_CHAR_DIM, dest="char_dim", hel
 parser.add_argument("--hidden-dim", default=DEFAULT_HIDDEN_DIM, dest="hidden_dim", help="dimension for LSTM layers (default = 50)")
 parser.add_argument("--num-lstm-layers", default=1, dest="num_lstm_layers", help="Number of LSTM layers (default = 1)")
 parser.add_argument("--all-from-lstm", dest="all_from_lstm", action="store_true", help="if toggled, vectors in original training set are overriden by LSTM-generated vectors")
+parser.add_argument("--normalized-targets", dest="normalized_targets", action="store_true", help="if toggled, train on normalized vectors from set")
 parser.add_argument("--dropout", default=-1, dest="dropout", type=float, help="amount of dropout to apply to LSTM part of graph")
 parser.add_argument("--num-epochs", default=10, dest="num_epochs", type=int, help="Number of full passes through training set (default = 10)")
 parser.add_argument("--learning-rate", default=0.01, dest="learning_rate", type=float, help="Initial learning rate")
-parser.add_argument("--dynet-mem", help="Ignore this outside argument")
 parser.add_argument("--cosine", dest="cosine", action="store_true", help="Use cosine as diff measure")
+parser.add_argument("--dynet-mem", help="Ignore this outside argument")
 parser.add_argument("--debug", dest="debug", action="store_true", help="Debug mode")
 options = parser.parse_args()
 
@@ -162,6 +163,10 @@ if options.debug:
     dev_instances = dev_instances[:int(len(dev_instances)/20)]
 else:
     train_instances = training_instances
+
+if options.normalized_targets:
+    train_instances = [Instance(ins.chars, ins.word_emb/np.linalg.norm(ins.word_emb)) for ins in train_instances]
+    dev_instances = [Instance(ins.chars, ins.word_emb/np.linalg.norm(ins.word_emb)) for ins in dev_instances]
 
 epcs = int(options.num_epochs)
 pretrained_vec_norms = 0.0
@@ -234,7 +239,17 @@ for epoch in xrange(epcs):
     root_logger.info("Dev Loss: {}".format(dev_loss))
 
 root_logger.info("\n")
-root_logger.info("Average norm for pre-trained in vocab: {}".format(pretrained_vec_norms / (len(training_instances) + len(dev_instances))))
+root_logger.info("Average norm for pre-trained in vocab: {}".format(pretrained_vec_norms / (len(train_instances) + len(dev_instances))))
+    
+# write all
+with codecs.open(options.output, "w", "utf-8") as writer:
+    for vw, emb in vocab_words.iteritems():
+        writer.write(vw + " ")
+        for i in emb:
+            writer.write(str(i) + " ")
+        writer.write("\n")
+
+# TODO save model
 
 # Infer for test set
 showcase_size = 25
@@ -263,15 +278,5 @@ for w in showcase:
     if options.debug:
         print w, [(i,d) for i,d in top_k]
     similar_words[w] = top_k
-	
-# write all
-with codecs.open(options.output, "w", "utf-8") as writer:
-    for vw, emb in vocab_words.iteritems():
-        writer.write(vw + " ")
-        for i in emb:
-            writer.write(str(i) + " ")
-        writer.write("\n")
-
-# TODO save model
 
 #root_logger.info("\nSome most-similar words from training set for a random selection of test set:\n{}".format("\n".join([k + ":\t" + " ".join([t[0] for t in v]) for k,v in similar_words.iteritems()])))
