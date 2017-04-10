@@ -239,7 +239,7 @@ for epoch in xrange(epcs):
     root_logger.info("Dev Loss: {}".format(dev_loss))
 
 root_logger.info("\n")
-root_logger.info("Average norm for pre-trained in vocab: {}".format(pretrained_vec_norms / (len(train_instances) + len(dev_instances))))
+root_logger.info("Average norm for pre-trained in vocab: {}".format(pretrained_vec_norms / len(vocab_words)))
     
 # write all
 with codecs.open(options.output, "w", "utf-8") as writer:
