@@ -30,58 +30,65 @@ def dev_pos_oov_acc(line_batch):
 def test_pos_oov_acc(line_batch):
     return float(line_batch[6].strip().split()[-1])
 
+langs = "vi hu tr he ta fa hi lv bg cs ru it es da sv en".split()
 # langs = ['da', 'en', 'hu', 'it', 'lv', 'tr', 'vi']
 # langs = ['ta', 'fa', 'ru', 'sv', 'he', 'bg', 'hi', 'cs', 'es']
 # langs = ['ta', 'fa', 'ru', 'sv', 'he', 'bg']
-# langs = "hu tr da it lv ru sv bg en".split()
 # langs = "hu da lv en".split()
+# langs = "hu tr he es ta".split()
 # langs = "hi cs es".split()
+# langs = ["hi"]
 # langs = ["lv"]
-langs = ["en"]
+# langs = ["en"]
 # models = ['nochar-nolc','tagchar-nolc','mchar','bothchar']
-# models = ['nochar','tagchar','mchar','bothchar']
+models = ['nochar','tagchar','mchar','bothchar']
 # models = ['mchar','bothchar']
-models = ['nochar','tagchar']
+# models = ['nochar','tagchar']
 # models = ['nochar','tagchar','mbochar','bothbochar']
 
-# oov=False
-oov = True
+test = True
+# test = False
+oov = False
+# oov = True
 # added="-lcbo"
 # added="-alllstm"
 added=""
-emb_algo = "ft"
-# emb_algo = "pg"
+# emb_algo = "ft"
+emb_algo = "pg"
 
-with open('{}-summary{}{}-{}.txt'.format(emb_algo, "-oov" if oov else "", added, "-".join(langs)),'w') as sum_file:
+with open('{}-summary{}{}{}-{}.txt'.format(emb_algo, "-oov" if oov else "", "-test" if test else "", added, "-".join(langs)),'w') as sum_file:
     for lg in langs:
-        dev_pos_acc_averages = {}
-        dev_pos_oov_acc_averages = {}
-        dev_att_f1_averages = {}
-        dev_pos_acc_stddevs = {}
-        dev_pos_oov_acc_stddevs = {}
-        dev_att_f1_stddevs = {}
+        pos_acc_averages = {}
+        pos_oov_acc_averages = {}
+        att_f1_averages = {}
+        pos_acc_stddevs = {}
+        pos_oov_acc_stddevs = {}
+        att_f1_stddevs = {}
         for m in models:
             with open('results-{}-{}{}-{}.txt'.format(lg, emb_algo, added, m), 'r') as res_file:
                 lines = res_file.readlines()
                 res_batches = [lines[i:i+LOGSUM_LEN] for i in xrange(0, len(lines), LOGSUM_LEN)]
-                
+
                 # init file-through reporting vars
                 tr_tok_headers = []
-                dev_pos_acc_averages[m] = []
-                dev_pos_oov_acc_averages[m] = []
-                dev_att_f1_averages[m] = []
-                dev_pos_acc_stddevs[m] = []
-                dev_pos_oov_acc_stddevs[m] = []
-                dev_att_f1_stddevs[m] = []
-                
+                pos_acc_averages[m] = []
+                pos_oov_acc_averages[m] = []
+                att_f1_averages[m] = []
+                pos_acc_stddevs[m] = []
+                pos_oov_acc_stddevs[m] = []
+                att_f1_stddevs[m] = []
+
                 # init per-setup vars
                 tr_toks = 0
                 run = 0
                 dev_pos_accs = []
                 dev_pos_oov_accs = []
                 dev_att_f1s = []
-                # TODO add test, macro f1s
-                
+                test_pos_accs = []
+                test_pos_oov_accs = []
+                test_att_f1s = []
+                # TODO add macro f1s
+
                 for b in res_batches:
                     tl = title_line(b)
                     assert tl.startswith('.')
@@ -95,31 +102,44 @@ with open('{}-summary{}{}-{}.txt'.format(emb_algo, "-oov" if oov else "", added,
                     dev_pos_accs.append(dev_pos_acc(b))
                     dev_pos_oov_accs.append(dev_pos_oov_acc(b))
                     dev_att_f1s.append(dev_mic_att_acc(b))
+                    test_pos_accs.append(test_pos_acc(b))
+                    test_pos_oov_accs.append(test_pos_oov_acc(b))
+                    test_att_f1s.append(test_mic_att_acc(b))
                     if curr_part == 5:
-                    
+
                         # add accumlations to reporting
                         tr_tok_headers.append(str(tr_toks))
-                        dev_pos_acc_averages[m].append("{:4f}".format(np.average(dev_pos_accs)))
-                        dev_pos_oov_acc_averages[m].append("{:4f}".format(np.average(dev_pos_oov_accs)))
-                        dev_att_f1_averages[m].append("{:4f}".format(np.average(dev_att_f1s)))
-                        
-                        dev_pos_acc_stddevs[m].append("{:4f}".format(np.std(dev_pos_accs)))
-                        dev_pos_oov_acc_stddevs[m].append("{:4f}".format(np.std(dev_pos_oov_accs)))
-                        dev_att_f1_stddevs[m].append("{:4f}".format(np.std(dev_att_f1s)))
-                        
+                        if not test:
+                            pos_acc_averages[m].append("{:4f}".format(np.average(dev_pos_accs)))
+                            pos_oov_acc_averages[m].append("{:4f}".format(np.average(dev_pos_oov_accs)))
+                            att_f1_averages[m].append("{:4f}".format(np.average(dev_att_f1s)))
+                            pos_acc_stddevs[m].append("{:4f}".format(np.std(dev_pos_accs)))
+                            pos_oov_acc_stddevs[m].append("{:4f}".format(np.std(dev_pos_oov_accs)))
+                            att_f1_stddevs[m].append("{:4f}".format(np.std(dev_att_f1s)))
+                        else:
+                            pos_acc_averages[m].append("{:4f}".format(np.average(test_pos_accs)))
+                            pos_oov_acc_averages[m].append("{:4f}".format(np.average(test_pos_oov_accs)))
+                            att_f1_averages[m].append("{:4f}".format(np.average(test_att_f1s)))
+                            pos_acc_stddevs[m].append("{:4f}".format(np.std(test_pos_accs)))
+                            pos_oov_acc_stddevs[m].append("{:4f}".format(np.std(test_pos_oov_accs)))
+                            att_f1_stddevs[m].append("{:4f}".format(np.std(test_att_f1s)))
+
                         # init per-setup vars
                         dev_pos_accs = []
                         dev_pos_oov_accs = []
                         dev_att_f1s = []
-                        
+                        test_pos_accs = []
+                        test_pos_oov_accs = []
+                        test_att_f1s = []
+
         # write all reporting in output file
         sum_file.write("{}-polyglot:\n".format(lg))
         if oov:
-            fields = zip([dev_pos_oov_acc_averages], ['POS-acc-oov-avg'])
+            fields = zip([pos_oov_acc_averages], ['POS-acc-oov-avg'])
         else:
-            fields = zip([dev_pos_acc_averages, dev_att_f1_averages, dev_pos_acc_stddevs, dev_att_f1_stddevs], ['POS-acc-avg','Att-F1-avg','POS-acc-std','Att-F1-std'])
+            fields = zip([pos_acc_averages, att_f1_averages, pos_acc_stddevs, att_f1_stddevs], ['POS-acc-avg','Att-F1-avg','POS-acc-std','Att-F1-std'])
         for dict, name in fields:
             sum_file.write(name + '\t' + '\t'.join(tr_tok_headers) + '\n')
             for m in models:
                 sum_file.write(m + '\t' + '\t'.join(dict[m]) + '\n')
-                
+
