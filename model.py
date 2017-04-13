@@ -45,7 +45,7 @@ class BiLSTM_CRF:
         self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
         if word_embeddings is not None:
             self.words_lookup.init_from_array(word_embeddings)
-        
+
         # Char LSTM Parameters
         self.use_char_rnn = use_char_rnn
         if use_char_rnn:
@@ -58,7 +58,7 @@ class BiLSTM_CRF:
         else:
             input_dim = word_embedding_dim
         self.bi_lstm = dy.BiRNNBuilder(num_lstm_layers, input_dim, hidden_dim, self.model, dy.LSTMBuilder)
-        
+
         self.attributes = tagset_sizes.keys()
         self.lstm_to_tags_params = {}
         self.lstm_to_tags_bias = {}
@@ -71,7 +71,7 @@ class BiLSTM_CRF:
             self.lstm_to_tags_bias[attribute] = self.model.add_parameters(set_size)
             self.mlp_out[attribute] = self.model.add_parameters((set_size, set_size))
             self.mlp_out_bias[attribute] = self.model.add_parameters(set_size)
-    
+
             # Transition matrix for tagging layer, [i,j] is score of transitioning to i from j
             self.transitions[attribute] = self.model.add_lookup_parameters((set_size, set_size))
 
@@ -112,9 +112,9 @@ class BiLSTM_CRF:
         dy.renew_cg()
 
         embeddings = [self.word_rep(w) for w in sentence]
-        
+
         lstm_out = self.bi_lstm.transduce(embeddings)
-        
+
         scores = {}
         H = {}
         Hb = {}
@@ -221,20 +221,20 @@ class BiLSTM_CRF:
                 bptrs_t.append(best_tag_id)
                 vvars_t.append(dy.pick(next_tag_expr, best_tag_id))
             for_expr = dy.concatenate(vvars_t) + obs
-            
+
             # optional margin adaptation
             if use_margins and self.margins[att] != 0:
                 adjust = [self.margins[att]] * tagset_size
                 adjust[gold] = 0
                 for_expr = for_expr + dy.inputVector(adjust)
             backpointers.append(bptrs_t)
-        
+
         # Perform final transition to terminal
         terminal_expr = for_expr + trans_exprs[t2i[END_TAG]]
         terminal_arr  = terminal_expr.npvalue()
         best_tag_id   = np.argmax(terminal_arr)
         path_score    = dy.pick(terminal_expr, best_tag_id)
-        
+
         # Reverse over the backpointers to get the best path
         best_path = [best_tag_id] # Start with the tag that was best for terminal
         for bptrs_t in reversed(backpointers):
@@ -259,10 +259,10 @@ class BiLSTM_CRF:
         members_to_save.extend(utils.sortvals(self.mlp_out_bias))
         members_to_save.extend(utils.sortvals(self.transitions))
         self.model.save(file_name, members_to_save)
-        
+
         with open(file_name + "-atts", 'w') as attdict:
             attdict.write("\t".join(sorted(self.attributes)))
-    
+
     @property
     def model(self):
         return self.model
@@ -280,13 +280,13 @@ class LSTMTagger:
             self.att_props = {att:(1.0-p) for att,p in att_props.iteritems()}
         else:
             self.att_props = None
-        
+
         if word_embeddings is not None: # Use pretrained embeddings
             vocab_size = word_embeddings.shape[0]
             word_embedding_dim = word_embeddings.shape[1]
-        
+
         self.words_lookup = self.model.add_lookup_parameters((vocab_size, word_embedding_dim))
-        
+
         if word_embeddings is not None:
             self.words_lookup.init_from_array(word_embeddings)
 
@@ -351,7 +351,7 @@ class LSTMTagger:
         O = {}
         Ob = {}
         scores = {}
-        for att in self.attributes:        
+        for att in self.attributes:
             H[att] = dy.parameter(self.lstm_to_tags_params[att])
             Hb[att] = dy.parameter(self.lstm_to_tags_bias[att])
             O[att] = dy.parameter(self.mlp_out[att])
@@ -393,7 +393,7 @@ class LSTMTagger:
             tag_seqs[att] = tag_seq
         return tag_seqs
 
-    
+
     def set_dropout(self, p):
         self.word_bi_lstm.set_dropout(p)
 
@@ -413,7 +413,7 @@ class LSTMTagger:
         members_to_save.extend(utils.sortvals(self.mlp_out))
         members_to_save.extend(utils.sortvals(self.mlp_out_bias))
         self.model.save(file_name, members_to_save)
-        
+
         with open(file_name + "-atts", 'w') as attdict:
             attdict.write("\t".join(sorted(self.attributes)))
 
@@ -529,7 +529,7 @@ test_instances = dataset["test_instances"]
 if len(training_instances) > options.training_sentence_size:
     random.shuffle(training_instances)
     training_instances = training_instances[:options.training_sentence_size]
-    
+
 # trim training set for size evaluation (token based)
 training_corpus_size = sum(training_vocab.values())
 if training_corpus_size > options.token_size:
@@ -621,7 +621,7 @@ for epoch in xrange(int(options.num_epochs)):
         train_instances = training_instances[0:int(len(training_instances)/20)]
     else:
         train_instances = training_instances
-    
+
     for idx,instance in enumerate(bar(train_instances)):
         if len(instance.sentence) == 0: continue
 
@@ -671,7 +671,7 @@ for epoch in xrange(int(options.num_epochs)):
                 print "KL Div {} with weight {} added to loss {}".format(kl_div.value(), options.kl_weight, loss_expr.value())
             loss_expr = loss_expr + weighted_kl_div
         loss = loss_expr.scalar_value()
-        
+
         # Bail if loss is NaN
         if math.isnan(loss):
             assert False, "NaN occured"
@@ -720,7 +720,7 @@ for epoch in xrange(int(options.num_epochs)):
                 losses = model.neg_log_loss(instance.sentence, gold_tags)
                 total_loss = sum([l.value() for l in losses.values()]) # TODO or average
                 _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags, use_margins=False)
-                
+
             gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
             obs_strings = utils.morphotag_strings(i2ts, out_tags_set, options.pos_separate_col)
             for g, o in zip(gold_strings, obs_strings):
@@ -739,17 +739,17 @@ for epoch in xrange(int(options.num_epochs)):
                         correct_sent = False
                         if i2w[word] not in training_vocab:
                             total_wrong_oov[att] += 1
-                    
+
                     if i2w[word] not in training_vocab:
                         dev_oov_total[att] += 1
                         oov_strings.append("OOV")
                     else:
                         oov_strings.append("")
-                        
+
                 dev_total[att] += len(tags)
-                
+
             dev_loss += (total_loss / len(instance.sentence))
-            
+
             dev_writer.write(("\n"
                              + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
                                                                          gold_strings, obs_strings, oov_strings)])
@@ -758,7 +758,7 @@ for epoch in xrange(int(options.num_epochs)):
 
     train_loss = train_loss / len(train_instances)
     dev_loss = dev_loss / len(d_instances)
-    
+
     # logging this epoch
     if options.viterbi:
         logging.info("POS Train Accuracy: {}".format(train_correct[POS_KEY] / train_total[POS_KEY]))
@@ -772,11 +772,11 @@ for epoch in xrange(int(options.num_epochs)):
     logging.info("Total attribute F1s: {} micro, {} macro, POS included = {}".format(f1_eval.mic_f1(), f1_eval.mac_f1(), not options.pos_separate_col))
 
     logging.info("Total dev tokens: {}, Total dev OOV: {}, % OOV: {}".format(dev_total[POS_KEY], dev_oov_total[POS_KEY], dev_oov_total[POS_KEY] / dev_total[POS_KEY]))
-    
+
     logging.info("Train Loss: {}".format(train_loss))
     logging.info("Dev Loss: {}".format(dev_loss))
     train_dev_cost.add_column([train_loss, dev_loss])
-    
+
     # Serialize model
     if not options.no_model:
         new_model_file_name = "{}/model_epoch-{:02d}.bin".format(options.log_dir, epoch + 1)
@@ -824,7 +824,7 @@ with open("{}/testout.txt".format(options.log_dir), 'w') as test_writer:
                 if att not in instance.tags:
                     gold_tags[att] = [t2is[att][NONE_TAG]] * len(instance.sentence)
             _, out_tags_set = model.viterbi_loss(instance.sentence, gold_tags, use_margins=False)
-            
+
         gold_strings = utils.morphotag_strings(i2ts, gold_tags, options.pos_separate_col)
         obs_strings = utils.morphotag_strings(i2ts, out_tags_set, options.pos_separate_col)
         for g, o in zip(gold_strings, obs_strings):
@@ -843,18 +843,19 @@ with open("{}/testout.txt".format(options.log_dir), 'w') as test_writer:
                     correct_sent = False
                     if i2w[word] not in training_vocab:
                         total_wrong_oov[att] += 1
-                        oov_strings.append("OOV")
-                    else:
-                        oov_strings.append("")
-                
+
                 if i2w[word] not in training_vocab:
                     test_oov_total[att] += 1
+                    oov_strings.append("OOV")
+                else:
+                    oov_strings.append("")
+
             test_total[att] += len(tags)
         test_writer.write(("\n"
                          + "\n".join(["\t".join(z) for z in zip([i2w[w] for w in instance.sentence],
                                                                      gold_strings, obs_strings, oov_strings)])
                          + "\n").encode('utf8'))
-        
+
 
 logging.info("POS Test Accuracy: {}".format(test_correct[POS_KEY] / test_total[POS_KEY]))
 logging.info("POS % OOV accuracy: {}".format((test_oov_total[POS_KEY] - total_wrong_oov[POS_KEY]) / test_oov_total[POS_KEY]))
