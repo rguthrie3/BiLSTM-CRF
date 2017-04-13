@@ -1,5 +1,5 @@
 from codecs import open
-import scipy
+import scipy.stats
 
 def word(cols):
     return cols[0].strip()
@@ -34,8 +34,8 @@ def extract_stats(file1, file2):
             continue
 
         total += 1
-        cols1 = l1.split()
-        cols2 = l2.split()
+        cols1 = l1.split('\t')
+        cols2 = l2.split('\t')
 
         assert word(cols1) == word(cols2)
         assert gold_pos(cols1) == gold_pos(cols2)
@@ -49,17 +49,19 @@ def extract_stats(file1, file2):
 
         if ppred1 != pgold and ppred2 == pgold:
             wrong1 += 1
-            if is_oov:
+            if isoov:
                 wrong_oov1 += 1
         if ppred2 != pgold and ppred1 == pgold:
             wrong2 += 1
-            if is_oov:
+            if isoov:
                 wrong_oov2 += 1
 
     return wrong1, wrong2, total, wil_p(wrong1, wrong2),\
             wrong_oov1, wrong_oov2, wil_p(wrong_oov1, wrong_oov2)
 
-langs = []
+# langs = ['fa', 'hi', 'en', 'es', 'it', 'da', 'he', 'sv', 'bg', 'cs', 'lv', 'hu', 'tr', 'ta', 'ru', 'vi']
+langs = ['fa', 'hi', 'es', 'it', 'da', 'he', 'sv', 'bg', 'lv', 'hu', 'tr', 'ta', 'ru', 'vi']
+# langs = ['en', 'cs']
 base_format = "logs_token_exp_sign/log-{}-10k-noseq-pginit-{}char-05dr/testout.txt"
 
 with open("logs_token_exp_10k-sign.txt","w","utf-8") as outfile:
@@ -77,4 +79,4 @@ with open("logs_token_exp_10k-sign.txt","w","utf-8") as outfile:
         wt, wb, _, wilw, wto, wbo, wilwv = extract_stats(tagfile, bothfile)
         print lg, "with", wt, wb, wilw, wto, wbo, wilwv
 
-        outfile.write("\t".join([lg, wilwo, wilw, wilwov, wilwv]) + "\n")
+        outfile.write("\t".join([lg, wilwo < 0.05, wilw < 0.05, wilwov < 0.05, wilwv < 0.05]) + "\n")
