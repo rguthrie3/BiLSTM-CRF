@@ -29,11 +29,19 @@ def bootstrap_samples(set_size, n):
     return [[random.randint(0, set_size - 1) for i in xrange(set_size)] for _ in xrange(n)]
 
 def extract_att_stats(file1, file2, n):
+
+    # get tuples per each token annotation: gold attributes, predicted by 1st algo, predicted by 2nd algo.
+    # each entry within a tuple is a dictionary from attributes to values.
     all_pairs = [(gold_atts(l1.split('\t')), pred_atts(l1.split('\t')), pred_atts(l2.split('\t')))\
                     for l1, l2 in zip(file1, file2) if len(l1.strip()) > 0]
+
+    # retrieve samples based on this randomization
     boot_assignments = bootstrap_samples(len(all_pairs), n)
+
     f1_diffs = []
     for bas in boot_assignments:
+
+        # an Evaluator aggregates (gold, observed) tuples and finally computes F1
         f1_eval1 = Evaluator(m = 'att')
         f1_eval2 = Evaluator(m = 'att')
         for idx in bas:
@@ -42,6 +50,8 @@ def extract_att_stats(file1, file2, n):
             f1_eval2.add_instance(g, o2)
         f1_diffs.append(f1_eval1.mic_f1() - f1_eval2.mic_f1())
     diff_arr = np.array(f1_diffs)
+
+    # compute p-value
     return scipy.stats.norm.cdf(diff_arr.mean() / diff_arr.std())
 
 ### POS tagging - Wilcoxon ###
