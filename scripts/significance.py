@@ -26,7 +26,7 @@ def is_oov(cols):
 ### Attribute F1 - Bootstrap ###
 
 def bootstrap_samples(set_size, n):
-    return [[random.randint(0, set_size - 1) for i in xrange(set_size)] for j in xrange(n)]
+    return [[random.randint(0, set_size - 1) for i in xrange(set_size)] for _ in xrange(n)]
 
 def extract_att_stats(file1, file2, n):
     all_pairs = [(gold_atts(l1.split('\t')), pred_atts(l1.split('\t')), pred_atts(l2.split('\t')))\
@@ -40,8 +40,9 @@ def extract_att_stats(file1, file2, n):
             g, o1, o2 = all_pairs[idx]
             f1_eval1.add_instance(g, o1)
             f1_eval2.add_instance(g, o2)
-        f1_diffs.append(f1_eval2.mic_f1() - f1_eval1.mic_f1())
-    return 1.0 - scipy.stats.norm.cdf(np.average(f1_diffs), 0, 1.0/n)
+        f1_diffs.append(f1_eval1.mic_f1() - f1_eval2.mic_f1())
+    diff_arr = np.array(f1_diffs)
+    return scipy.stats.norm.cdf(diff_arr.mean() / diff_arr.std())
 
 ### POS tagging - Wilcoxon ###
 
@@ -88,9 +89,9 @@ def extract_pos_stats(file1, file2):
 debug = True
 langs = ['fa', 'hi', 'en', 'es', 'it', 'da', 'he', 'sv', 'bg', 'cs', 'lv', 'hu', 'tr', 'ta', 'ru', 'vi']
 base_format = "logs_token_exp_sign/log-{}-10k-noseq-pginit-{}char-05dr/testout.txt"
-bar = 0.01
-#bar = 0.05
-boots_n = 150
+#bar = 0.01
+bar = 0.05
+boots_n = 100
 
 with open("logs_token_exp_10k-sign-{}.txt".format(bar),"w","utf-8") as outfile:
     for lg in langs:
