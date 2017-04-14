@@ -77,6 +77,9 @@ def extract_pos_stats(file1, file2):
     corr1 = 0
     corr2 = 0
     total = 0
+    total_oov = 0
+    corrv1 = 0
+    corrv2 = 0
     for l1, l2 in zip(file1, file2):
         if len(l1.strip()) == 0:
             assert len(l1.strip()) == 0
@@ -99,6 +102,12 @@ def extract_pos_stats(file1, file2):
         if ppred1 == pgold: corr1 += 100
         if ppred2 == pgold: corr2 += 100
 
+        # accuracy for OOV
+        if isoov:
+            total_oov += 1
+            if ppred1 == pgold: corrv1 += 100
+            if ppred2 == pgold: corrv2 += 100
+
         #significance
         if ppred1 == ppred2: continue
 
@@ -111,21 +120,31 @@ def extract_pos_stats(file1, file2):
             if isoov:
                 wrong_oov2 += 1
 
-    return corr1/total, corr2/total, wrong1, wrong2, total, wil_p(wrong1, wrong2),\
+    return corr1/total, corr2/total, corrv1/total_oov, corrv2/total_oov,\
+            wrong1, wrong2, total, wil_p(wrong1, wrong2),\
             wrong_oov1, wrong_oov2, wil_p(wrong_oov1, wrong_oov2)
 
 debug = False
-# langs = ['fa', 'hi', 'en', 'es', 'it', 'da', 'he', 'sv', 'bg', 'cs', 'lv', 'hu', 'tr', 'ta', 'ru', 'vi'] # order by %OOV
-langs = ['ta', 'lv', 'vi', 'hu', 'tr', 'bg', 'sv', 'ru', 'da', 'fa', 'he', 'en', 'hi', 'it', 'es', 'cs'] # order by unlabeled data
-base_format = "rerun_full_logs/log-{}-rerun-noseq-pginit-{}char-05dr/testout.txt"
+
+langs = ['fa', 'hi', 'en', 'es', 'it', 'da', 'he', 'sv', 'bg', 'cs', 'lv', 'hu', 'tr', 'ta', 'ru', 'vi'] # order by %OOV
+# langs = ['ta', 'lv', 'vi', 'hu', 'tr', 'bg', 'sv', 'ru', 'da', 'fa', 'he', 'en', 'hi', 'it', 'es', 'cs'] # order by training data
+
 #base_format = "logs_token_exp_sign/log-{}-10k-noseq-pginit-{}char-05dr/testout.txt"
+base_format = "rerun_full_logs/log-{}-rerun-noseq-pginit-{}char-05dr/testout.txt"
+#base_format = "logs_token_exp_sign_5k/log-{}-5k-noseq-pginit-{}char-05dr/testout.txt"
+
 bar = 0.01
 #bar = 0.05
-boots_n = 100
+
 #outtype = 'pos'
 outtype = 'att'
 
-with open("logs_token_exp_full-sign-{}-{}.txt".format(outtype, bar),"w","utf-8") as outfile:
+oov = True
+#oov = False
+
+boots_n = 100
+
+with open("logs_token_exp_full-sign-{}{}-{}.txt".format(outtype, "-oov" if oov else "", bar),"w","utf-8") as outfile:
     for lg in langs:
         if outtype == 'att' and lg == 'vi': continue
 
@@ -133,7 +152,7 @@ with open("logs_token_exp_full-sign-{}-{}.txt".format(outtype, bar),"w","utf-8")
         nofile = open(base_format.format(lg, "no"), "r", "utf-8").readlines()
         mfile = open(base_format.format(lg, "m"), "r", "utf-8").readlines()
         if outtype == 'pos':
-            accn, accm, wn, wm, _, wilwo, wno, wmo, wilwov = extract_pos_stats(nofile, mfile)
+            accn, accm, accnv, accmv, wn, wm, _, wilwo, wno, wmo, wilwov = extract_pos_stats(nofile, mfile)
         else:
             f1n, f1m, atwo = extract_att_stats(nofile, mfile, boots_n)
 
@@ -143,16 +162,21 @@ with open("logs_token_exp_full-sign-{}-{}.txt".format(outtype, bar),"w","utf-8")
         tagfile = open(base_format.format(lg, "tag"), "r", "utf-8").readlines()
         bothfile = open(base_format.format(lg, "both"), "r", "utf-8").readlines()
         if outtype == 'pos':
-            acct, accb, wt, wb, _, wilw, wto, wbo, wilwv = extract_pos_stats(tagfile, bothfile)
+            acct, accb, acctv, accbv, wt, wb, _, wilw, wto, wbo, wilwv = extract_pos_stats(tagfile, bothfile)
         else:
             f1t, f1b, atw = extract_att_stats(tagfile, bothfile, boots_n)
 
         if debug: print lg, "with", wt, wb, wilw, wto, wbo, wilwv, atw
 
         if outtype == 'pos':
-            m_sign = "*" if wilwo < bar else ""
-            b_sign = "*" if wilw < bar else ""
-            outfile.write("{}\t{:.2f}\t{:.2f}\t{:.2f}{}\t{:.2f}{}\n".format(lg,accn,acct,accm,m_sign,accb,b_sign))
+            if oov:
+                mv_sign = "*" if wilwov < bar else ""
+                bv_sign = "*" if wilwv < bar else ""
+                outfile.write("{}\t{:.2f}\t{:.2f}\t{:.2f}{}\t{:.2f}{}\n".format(lg,accnv,acctv,accmv,mv_sign,accbv,bv_sign))
+            else:
+                m_sign = "*" if wilwo < bar else ""
+                b_sign = "*" if wilw < bar else ""
+                outfile.write("{}\t{:.2f}\t{:.2f}\t{:.2f}{}\t{:.2f}{}\n".format(lg,accn,acct,accm,m_sign,accb,b_sign))
         else:
             m_sign = "*" if atwo < bar else ""
             b_sign = "*" if atw < bar else ""
