@@ -240,16 +240,6 @@ for epoch in xrange(epcs):
 
 root_logger.info("\n")
 root_logger.info("Average norm for pre-trained in vocab: {}".format(pretrained_vec_norms / len(vocab_words)))
-    
-# write all
-with codecs.open(options.output, "w", "utf-8") as writer:
-    for vw, emb in vocab_words.iteritems():
-        writer.write(vw + " ")
-        for i in emb:
-            writer.write(str(i) + " ")
-        writer.write("\n")
-
-# TODO save model
 
 # Infer for test set
 showcase_size = 25
@@ -278,5 +268,16 @@ for w in showcase:
     if options.debug:
         print w, [(i,d) for i,d in top_k]
     similar_words[w] = top_k
+
+    
+# write all
+with codecs.open(options.output, "w", "utf-8") as writer:
+    for vw, emb in vocab_words.iteritems():
+        writer.write(vw + " ")
+        for i in emb:
+            writer.write(str(i) + " ")
+        writer.write("\n")
+
+# TODO save model
 
 #root_logger.info("\nSome most-similar words from training set for a random selection of test set:\n{}".format("\n".join([k + ":\t" + " ".join([t[0] for t in v]) for k,v in similar_words.iteritems()])))
