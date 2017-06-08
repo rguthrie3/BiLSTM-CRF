@@ -24,6 +24,16 @@ def pred_atts(cols):
 def is_oov(cols):
     return len(cols[-1].strip()) > 0
 
+def header(outtype):
+    if outtype == 'pos':
+        return "Language\tNone acc\tTag acc\tMim acc\tBoth acc"
+    elif outtype == 'att':
+        return "Language\tNone F1\tTag F1\tMim F1\tBoth F1"
+    elif outtype == 'att-raw':
+        return "Language\tTag F1\tMim F1\tp"
+    else: # 'pos-raw' or 'pos-sent'
+        return "Language\tTag acc\tMim acc\tp"
+
 ### Attribute F1 - Bootstrap ###
 
 def bootstrap_samples(set_size, n):
@@ -69,6 +79,53 @@ def extract_att_stats(file1, file2, n):
 def wil_p(wrong1, wrong2):
     return scipy.stats.wilcoxon(([1] * wrong1) + ([-1] * wrong2))[1]
 
+def extract_sentence_level_pos_stats(file1, file2):
+    total_sens = 0
+    accs1 = []
+    accs2 = []
+    acc_diffs = []
+    senlen = 0
+    corr1 = 0
+    corr2 = 0
+    for l1, l2 in zip(file1, file2):
+        if len(l1.strip()) == 0:
+            assert len(l2.strip()) == 0
+            if senlen == 0: continue
+            total_sens += 1
+            # add diff to aggregator
+            acc1 = corr1 / senlen
+            acc2 = corr2 / senlen
+            accs1.append(acc1)
+            accs2.append(acc2)
+            if corr1 != corr2:
+                acc_diffs.append(acc1 - acc2)
+
+            # restart caches
+            senlen = 0
+            corr1 = 0
+            corr2 = 0
+            continue
+
+        senlen += 1
+
+        cols1 = l1.split('\t')
+        cols2 = l2.split('\t')
+
+        assert word(cols1) == word(cols2)
+        assert gold_pos(cols1) == gold_pos(cols2)
+        assert is_oov(cols1) == is_oov(cols2)
+        pgold = gold_pos(cols1)
+
+        ppred1 = pred_pos(cols1)
+        ppred2 = pred_pos(cols2)
+
+        #accuracy in percent
+        if ppred1 == pgold: corr1 += 1
+        if ppred2 == pgold: corr2 += 1
+
+    wil = scipy.stats.wilcoxon(acc_diffs)[1]
+    return np.average(accs1), np.average(accs2), total_sens, wil
+
 def extract_pos_stats(file1, file2):
     wrong1 = 0
     wrong2 = 0
@@ -82,7 +139,7 @@ def extract_pos_stats(file1, file2):
     corrv2 = 0
     for l1, l2 in zip(file1, file2):
         if len(l1.strip()) == 0:
-            assert len(l1.strip()) == 0
+            assert len(l2.strip()) == 0
             continue
 
         total += 1
@@ -126,25 +183,32 @@ def extract_pos_stats(file1, file2):
 
 debug = False
 
-langs = ['fa', 'hi', 'en', 'es', 'it', 'da', 'he', 'sv', 'bg', 'cs', 'lv', 'hu', 'tr', 'ta', 'ru', 'vi'] # order by %OOV
-# langs = ['ta', 'lv', 'vi', 'hu', 'tr', 'bg', 'sv', 'ru', 'da', 'fa', 'he', 'en', 'hi', 'it', 'es', 'cs'] # order by training data
+# langs = ['fa', 'hi', 'en', 'es', 'it', 'da', 'he', 'sv', 'bg', 'cs', 'lv', 'hu', 'tr', 'ta', 'ru', 'vi'] # order by %OOV
+langs = ['ta', 'lv', 'vi', 'hu', 'tr', 'bg', 'sv', 'ru', 'da', 'fa', 'he', 'en', 'hi', 'it', 'es', 'cs'] # order by training data
 
 #base_format = "logs_token_exp_sign/log-{}-10k-noseq-pginit-{}char-05dr/testout.txt"
 base_format = "rerun_full_logs/log-{}-rerun-noseq-pginit-{}char-05dr/testout.txt"
+#base_format = "hi-logs/log-{}-rerun-noseq-10k-pginit-{}char-05dr/testout.txt"
 #base_format = "logs_token_exp_sign_5k/log-{}-5k-noseq-pginit-{}char-05dr/testout.txt"
 
-bar = 0.01
-#bar = 0.05
+testname = "m-v-tag"
 
+#bar = 0.01
+bar = 0.05
+
+#outtype = 'pos-raw'
+outtype = 'pos-sent'
+#outtype = 'att-raw'
 #outtype = 'pos'
-outtype = 'att'
+#outtype = 'att'
 
-oov = True
-#oov = False
+#oov = True
+oov = False
 
 boots_n = 100
 
-with open("logs_token_exp_full-sign-{}{}-{}.txt".format(outtype, "-oov" if oov else "", bar),"w","utf-8") as outfile:
+with open("logs_token_exp-{}-sign-{}{}-{}.txt".format(testname, outtype, "-oov" if oov else "", bar),"w","utf-8") as outfile:
+    outfile.write(header(outtype) + "\n")
     for lg in langs:
         if outtype == 'att' and lg == 'vi': continue
 
@@ -153,7 +217,7 @@ with open("logs_token_exp_full-sign-{}{}-{}.txt".format(outtype, "-oov" if oov e
         mfile = open(base_format.format(lg, "m"), "r", "utf-8").readlines()
         if outtype == 'pos':
             accn, accm, accnv, accmv, wn, wm, _, wilwo, wno, wmo, wilwov = extract_pos_stats(nofile, mfile)
-        else:
+        elif outtype == 'att':
             f1n, f1m, atwo = extract_att_stats(nofile, mfile, boots_n)
 
         if debug: print lg, "w/o", wn, wm, wilwo, wno, wmo, wilwov, atwo
@@ -163,8 +227,17 @@ with open("logs_token_exp_full-sign-{}{}-{}.txt".format(outtype, "-oov" if oov e
         bothfile = open(base_format.format(lg, "both"), "r", "utf-8").readlines()
         if outtype == 'pos':
             acct, accb, acctv, accbv, wt, wb, _, wilw, wto, wbo, wilwv = extract_pos_stats(tagfile, bothfile)
-        else:
+        elif outtype == 'att':
             f1t, f1b, atw = extract_att_stats(tagfile, bothfile, boots_n)
+
+        if outtype.endswith('raw'):
+            if outtype.startswith('pos'):
+                acct, accm, _, _, wt, wm, _, wilw, _, _, _ = extract_pos_stats(tagfile, mfile)
+            else: # att
+                f1t, f1m, atw = extract_att_stats(tagfile, mfile, boots_n)
+
+        if outtype == 'pos-sent':
+            acct, accm, _, wilw = extract_sentence_level_pos_stats(tagfile, mfile)
 
         if debug: print lg, "with", wt, wb, wilw, wto, wbo, wilwv, atw
 
@@ -177,11 +250,16 @@ with open("logs_token_exp_full-sign-{}{}-{}.txt".format(outtype, "-oov" if oov e
                 m_sign = "*" if wilwo < bar else ""
                 b_sign = "*" if wilw < bar else ""
                 outfile.write("{}\t{:.2f}\t{:.2f}\t{:.2f}{}\t{:.2f}{}\n".format(lg,accn,acct,accm,m_sign,accb,b_sign))
-        else:
+        elif outtype == 'att':
             m_sign = "*" if atwo < bar else ""
             b_sign = "*" if atw < bar else ""
             outfile.write("{}\t{:.2f}\t{:.2f}\t{:.2f}{}\t{:.2f}{}\n".format(lg,f1n,f1t,f1m,m_sign,f1b,b_sign))
             print "finished {}".format(lg)
+        elif outtype == 'pos-raw' or outtype == 'pos-sent':
+            outfile.write("{}\t{:.2f}\t{:.2f}\t{:.6f}\n".format(lg,acct,accm,wilw))
+        else: # att-raw
+            outfile.write("{}\t{:.2f}\t{:.2f}\t{:.6f}\n".format(lg,f1t,f1m,atw))
+
 
         #outfile.write("\t".join([lg, str(wilwo < bar), str(wilw < bar),\
             #str(wilwov < bar), str(wilwv < bar), str(atwo < bar), str(atw < bar)]) + "\n")
