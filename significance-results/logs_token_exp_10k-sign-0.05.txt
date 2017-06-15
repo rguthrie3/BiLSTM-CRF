@@ -1,0 +1,16 @@
+fa	False	True	True	True	True	True
+hi	True	True	True	True	False	False
+en	True	True	True	False	True	True
+es	False	False	False	False	True	True
+it	True	False	True	False	True	False
+da	True	True	True	True	True	True
+he	True	True	True	False	True	True
+sv	True	True	True	True	True	True
+bg	True	False	True	False	True	True
+cs	True	True	True	True	True	True
+lv	True	True	True	True	True	True
+hu	True	True	True	True	True	True
+tr	True	True	True	True	True	True
+ta	True	False	True	False	True	False
+ru	True	True	True	True	True	True
+vi	True	True	False	True	False	False
