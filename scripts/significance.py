@@ -312,9 +312,9 @@ with open("logs_token_exp-{}-sign-{}{}-{}.txt".format(testname, outtype, "-oov" 
         elif outtype == 'pos-raw':
             outfile.write("{}\t{:.4f}\t{:.4f}\t{:.12f}\t{}\t{}\t{}\n".format(lg,acct,accm,wilw,wt,wm,tot))
         elif outtype == 'pos-sent':
-            outfile.write("{}\t{:.4f}\t{:.4f}\t{:.4f}\t{:.12f}\t{}\n".format(lg,acct,accm,wilwt,wilwp,tot))
+            outfile.write("{}\t{:.4f}\t{:.4f}\t{:.0f}\t{:.12f}\t{}\n".format(lg,acct,accm,wilwt,wilwp,tot))
         else: # att-raw
-            outfile.write("{}\t{:.4f}\t{:.4f}\t{:.4f}\t{:.12f}\t{}\n".format(lg,f1t,f1m,atwt,atwp,tot))
+            outfile.write("{}\t{:.4f}\t{:.4f}\t{:.0f}\t{:.12f}\t{}\n".format(lg,f1t,f1m,atwt,atwp,tot))
 
 
         #outfile.write("\t".join([lg, str(wilwo < bar), str(wilw < bar),\
