@@ -26,6 +26,7 @@ POS_KEY = "POS"
 PADDING_CHAR = "<*>"
 
 DEFAULT_WORD_EMBEDDING_SIZE = 64
+TRAIN_LIMIT = 10000000
 
 class BiLSTM_CRF:
 
@@ -607,6 +608,7 @@ logging.info("Training Algorithm: {}".format(type(trainer)))
 logging.info("Number training instances: {}".format(len(training_instances)))
 logging.info("Number dev instances: {}".format(len(dev_instances)))
 
+training_total_tokens = 0
 for epoch in xrange(int(options.num_epochs)):
     bar = progressbar.ProgressBar()
     random.shuffle(training_instances)
@@ -677,6 +679,7 @@ for epoch in xrange(int(options.num_epochs)):
             assert False, "NaN occured"
 
         train_loss += (loss / len(instance.sentence))
+        training_total_tokens += len(instance.sentence)
 
         # Do backward pass and update parameters
         loss_expr.backward()
@@ -686,6 +689,11 @@ for epoch in xrange(int(options.num_epochs)):
     logging.info("Epoch {} complete".format(epoch + 1))
     trainer.update_epoch(1)
     print trainer.status()
+
+    train_loss = train_loss / len(train_instances)
+
+    ### hurry-up line for significance test
+    if training_total_tokens < TRAIN_LIMIT and epoch > 0 and epoch % 10 != 9: continue
 
     # Evaluate dev data
     model.disable_dropout()
@@ -756,7 +764,6 @@ for epoch in xrange(int(options.num_epochs)):
                              + "\n").encode('utf8'))
 
 
-    train_loss = train_loss / len(train_instances)
     dev_loss = dev_loss / len(d_instances)
 
     # logging this epoch
@@ -791,6 +798,8 @@ for epoch in xrange(int(options.num_epochs)):
             os.remove(old_model_file_name + "-atts")
             old_devout_file_name = "{}/devout_epoch-{:02d}.txt".format(options.log_dir, epoch)
             os.remove(old_devout_file_name)
+
+    if training_total_tokens >= TRAIN_LIMIT: break
 
 
 
@@ -858,9 +867,9 @@ with open("{}/testout.txt".format(options.log_dir), 'w') as test_writer:
 
 
 logging.info("POS Test Accuracy: {}".format(test_correct[POS_KEY] / test_total[POS_KEY]))
-logging.info("POS % OOV accuracy: {}".format((test_oov_total[POS_KEY] - total_wrong_oov[POS_KEY]) / test_oov_total[POS_KEY]))
+logging.info("POS % Test OOV accuracy: {}".format((test_oov_total[POS_KEY] - total_wrong_oov[POS_KEY]) / test_oov_total[POS_KEY]))
 if total_wrong[POS_KEY] > 0:
-    logging.info("POS % Wrong that are OOV: {}".format(total_wrong_oov[POS_KEY] / total_wrong[POS_KEY]))
+    logging.info("POS % Test Wrong that are OOV: {}".format(total_wrong_oov[POS_KEY] / total_wrong[POS_KEY]))
 for attr in t2is.keys():
     if attr != POS_KEY:
         logging.info("{} F1: {}".format(attr, f1_eval.mic_f1(att = attr)))
