@@ -31,9 +31,9 @@ def header(outtype):
     elif outtype == 'att':
         return "Language\tNone F1\tTag F1\tMim F1\tBoth F1"
     elif outtype == 'att-raw':
-        return "Language\tTag F1\tMim F1\tp"
+        return "Language\tTag F1\tMim F1\tt\tp"
     else: # 'pos-raw' or 'pos-sent'
-        return "Language\tTag acc\tMim acc\tp"
+        return "Language\tTag acc\tMim acc\tt\tp"
 
 ### Attribute F1 ###
 
@@ -84,7 +84,7 @@ def extract_bootstrap_att_stats(file1, file2, n):
     # return f11, f12, scipy.stats.norm.cdf(diff_arr.mean() / diff_arr.std()) # wrong
 
 def extract_sentence_level_att_stats(file1, file2, lg):
-    if lg == 'vi': return 0.,0.,0,0.
+    if lg == 'vi': return 0.,0.,0,0.,0.
     total_sens = 0
     senlen = 0
     f1s1 = []
@@ -119,9 +119,9 @@ def extract_sentence_level_att_stats(file1, file2, lg):
         f1_eval1.add_instance(g, o1)
         f1_eval2.add_instance(g, o2)
 
-    wil = scipy.stats.mannwhitneyu(x = f1s1, y = f1s2, alternative='greater')[1]
-    #wil = scipy.stats.wilcoxon(x = f1s1, y = f1s2, zero_method='wilcox')[1]
-    return np.average(f1s1), np.average(f1s2), total_sens, wil
+    #wil = scipy.stats.mannwhitneyu(x = f1s1, y = f1s2, alternative='greater')[1]
+    wilt, wilp = scipy.stats.wilcoxon(x = f1s1, y = f1s2, zero_method='wilcox')
+    return np.average(f1s1), np.average(f1s2), total_sens, wilt, wilp
 
 ### POS tagging ###
 
@@ -170,9 +170,9 @@ def extract_sentence_level_pos_stats(file1, file2):
         if ppred2 == pgold: corr2 += 1
 
     #wil = scipy.stats.wilcoxon(acc_diffs)[1]
-    wil = scipy.stats.mannwhitneyu(x = accs1, y = accs2, alternative='greater')[1]
-    #wil = scipy.stats.wilcoxon(x = accs1, y = accs2, zero_method='wilcox')[1]
-    return np.average(accs1), np.average(accs2), total_sens, wil
+    #wil = scipy.stats.mannwhitneyu(x = accs1, y = accs2, alternative='greater')[1]
+    wilt, wilp = scipy.stats.wilcoxon(x = accs1, y = accs2, zero_method='wilcox')
+    return np.average(accs1), np.average(accs2), total_sens, wilt, wilp
 
 def mcnemar(wrong1, wrong2):
     chi_sq = ((wrong1 - wrong2) ** 2) / (wrong1 + wrong2)
@@ -245,14 +245,14 @@ langs = ['ta', 'lv', 'vi', 'hu', 'tr', 'bg', 'sv', 'ru', 'da', 'fa', 'he', 'en',
 #base_format = "rerun_full_logs/log-{}-rerun-noseq-pginit-{}char-05dr/testout.txt"
 base_format = "logs_token_exp_sign_5k/log-{}-5k-noseq-pginit-{}char-05dr/testout.txt"
 
-testname = "mvtag-sents-5k-mw"
+testname = "mvtag-sents-5k-wtp"
 
 #bar = 0.01
 bar = 0.05
 
 #outtype = 'pos-raw'
-#outtype = 'pos-sent'
-outtype = 'att-raw'
+outtype = 'pos-sent'
+#outtype = 'att-raw'
 #outtype = 'pos'
 #outtype = 'att-boot'
 
@@ -288,10 +288,10 @@ with open("logs_token_exp-{}-sign-{}{}-{}.txt".format(testname, outtype, "-oov" 
             if outtype.startswith('pos'):
                 acct, accm, _, _, wt, wm, tot, wilw, _, _, _ = extract_pos_stats(tagfile, mfile)
             else: # att-raw
-                f1t, f1m, tot, atw = extract_sentence_level_att_stats(tagfile, mfile, lg)
+                f1t, f1m, tot, atwt, atwp = extract_sentence_level_att_stats(tagfile, mfile, lg)
 
         if outtype == 'pos-sent':
-            acct, accm, tot, wilw = extract_sentence_level_pos_stats(tagfile, mfile)
+            acct, accm, tot, wilwt, wilwp = extract_sentence_level_pos_stats(tagfile, mfile)
 
         if debug: print lg, "with", wt, wb, wilw, wto, wbo, wilwv, atw
 
@@ -312,9 +312,9 @@ with open("logs_token_exp-{}-sign-{}{}-{}.txt".format(testname, outtype, "-oov" 
         elif outtype == 'pos-raw':
             outfile.write("{}\t{:.4f}\t{:.4f}\t{:.12f}\t{}\t{}\t{}\n".format(lg,acct,accm,wilw,wt,wm,tot))
         elif outtype == 'pos-sent':
-            outfile.write("{}\t{:.4f}\t{:.4f}\t{:.12f}\t{}\n".format(lg,acct,accm,wilw,tot))
+            outfile.write("{}\t{:.4f}\t{:.4f}\t{:.4f}\t{:.12f}\t{}\n".format(lg,acct,accm,wilwt,wilwp,tot))
         else: # att-raw
-            outfile.write("{}\t{:.4f}\t{:.4f}\t{:.12f}\t{}\n".format(lg,f1t,f1m,atw,tot))
+            outfile.write("{}\t{:.4f}\t{:.4f}\t{:.4f}\t{:.12f}\t{}\n".format(lg,f1t,f1m,atwt,atwp,tot))
 
 
         #outfile.write("\t".join([lg, str(wilwo < bar), str(wilw < bar),\
