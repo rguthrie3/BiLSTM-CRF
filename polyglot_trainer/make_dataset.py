@@ -81,6 +81,7 @@ with codecs.open(options.output, "w", "utf-8") as outfile:
     print "Total in Training Vocabulary:", in_vocab
     print "Percentage in-vocab:", in_vocab / total
     print "Total in Embeddings vocabulary:", len(words)
+    print "Character count: ", len(c2i)
 
 c2i[PADDING_CHAR] = len(c2i)
 
