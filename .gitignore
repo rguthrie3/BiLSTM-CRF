@@ -6,3 +6,14 @@ log*/
 vocab.txt
 data/
 /morphotag_utils.py
+polyglot_trainer/*.pkl
+polyglot_trainer/*.txt
+polyglot_trainer/*.gz
+polyglot_trainer/embedding_train_charlstm*
+polyglot_trainer/bad/
+scripts/utils.*
+attribute_alignment/
+misc-results/
+datasets/
+scripts/evaluate_morphotags.py
+morphotag_type_prediction/viz/
