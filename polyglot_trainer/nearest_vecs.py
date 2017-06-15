@@ -48,7 +48,7 @@ test_words = [wordify(i) for i in test_instances]
 if words_to_check is None:
     random.shuffle(test_words)
     words_to_check = test_words[:25]
-	
+    
 print "Checking words: {}".format(", ".join(words_to_check))
 
 test_vecs = {}
@@ -64,7 +64,7 @@ with codecs.open(options.embs, "r", "utf-8") as embs_file:
             elif not word in test_words:
                 iv_vecs[word] = vec
 
-print "Total in-vocab vecs: {} of size {}".format(len(iv_vecs), len(iv_vecs["the"]))
+#print "Total in-vocab vecs: {} of size {}".format(len(iv_vecs), len(iv_vecs["the"]))
 print "Total test vecs: {}".format(len(test_vecs))
 
 similar_words = {}
