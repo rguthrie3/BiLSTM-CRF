@@ -1,0 +1,1 @@
+for pos in nouns verbs; do python model.py --dataset data/da-ud-${pos}-mtpred.pkl --use-char-rnn --word-embeddings ../data/embs/da_polyglot_vectors_ud.txt --loss-prop --num-epochs 100 --hidden-dim -1 --log-dir da-${pos}-1l-pg-ch-100it; done

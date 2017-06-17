@@ -1,0 +1,350 @@
+./log-en-002000-noseq-pginit-mchar-05dr-1
+POS Dev Accuracy: 0.820741212025
+POS Test Accuracy: 0.827263308894
+Total attribute F1s: 0.723261456917 micro, 0.524853587427 macro, POS included = False
+Total attribute F1s: 0.726516865758 micro, 0.527541870652 macro, POS included = False
+POS % OOV accuracy: 0.651986596458
+POS % OOV accuracy: 0.664772727273
+POS % Wrong that are OOV: 0.161268855368
+POS % Wrong that are OOV: 0.17693194925
+
+./log-en-002000-noseq-pginit-mchar-05dr-2
+POS Dev Accuracy: 0.829966597741
+POS Test Accuracy: 0.832044947402
+Total attribute F1s: 0.704724827464 micro, 0.562410069444 macro, POS included = False
+Total attribute F1s: 0.709750485367 micro, 0.562049399635 macro, POS included = False
+POS % OOV accuracy: 0.638583054093
+POS % OOV accuracy: 0.659090909091
+POS % Wrong that are OOV: 0.176566884939
+POS % Wrong that are OOV: 0.185053380783
+
+./log-en-002000-noseq-pginit-mchar-05dr-3
+POS Dev Accuracy: 0.82245108955
+POS Test Accuracy: 0.82060886197
+Total attribute F1s: 0.710165094745 micro, 0.528094220349 macro, POS included = False
+Total attribute F1s: 0.714096069869 micro, 0.534856849609 macro, POS included = False
+POS % OOV accuracy: 0.653422690282
+POS % OOV accuracy: 0.636800699301
+POS % Wrong that are OOV: 0.162150055991
+POS % Wrong that are OOV: 0.184584629054
+
+./log-en-002000-noseq-pginit-mchar-05dr-4
+POS Dev Accuracy: 0.822053443614
+POS Test Accuracy: 0.822441823398
+Total attribute F1s: 0.724213161055 micro, 0.569205576642 macro, POS included = False
+Total attribute F1s: 0.72539162363 micro, 0.566426685358 macro, POS included = False
+POS % OOV accuracy: 0.668741024414
+POS % OOV accuracy: 0.670454545455
+POS % Wrong that are OOV: 0.154636871508
+POS % Wrong that are OOV: 0.16921005386
+
+./log-en-002000-noseq-pginit-mchar-05dr-5
+POS Dev Accuracy: 0.824200731669
+POS Test Accuracy: 0.823597386038
+Total attribute F1s: 0.711198630137 micro, 0.538146693066 macro, POS included = False
+Total attribute F1s: 0.713487935144 micro, 0.537875452918 macro, POS included = False
+POS % OOV accuracy: 0.650550502633
+POS % OOV accuracy: 0.637237762238
+POS % Wrong that are OOV: 0.165121013345
+POS % Wrong that are OOV: 0.187485882087
+
+./log-en-005000-noseq-pginit-mchar-05dr-1
+POS Dev Accuracy: 0.873310004772
+POS Test Accuracy: 0.876235256615
+Total attribute F1s: 0.845321859445 micro, 0.713617925599 macro, POS included = False
+Total attribute F1s: 0.845569707047 micro, 0.706371068916 macro, POS included = False
+POS % OOV accuracy: 0.692197223552
+POS % OOV accuracy: 0.693181818182
+POS % Wrong that are OOV: 0.201820464532
+POS % Wrong that are OOV: 0.22601416613
+
+./log-en-005000-noseq-pginit-mchar-05dr-2
+POS Dev Accuracy: 0.875218705265
+POS Test Accuracy: 0.875478163851
+Total attribute F1s: 0.817916423388 micro, 0.695503872719 macro, POS included = False
+Total attribute F1s: 0.818150929292 micro, 0.686984162851 macro, POS included = False
+POS % OOV accuracy: 0.68262326472
+POS % OOV accuracy: 0.681818181818
+POS % Wrong that are OOV: 0.211281070746
+POS % Wrong that are OOV: 0.23296
+
+./log-en-005000-noseq-pginit-mchar-05dr-3
+POS Dev Accuracy: 0.87406553205
+POS Test Accuracy: 0.87368504941
+Total attribute F1s: 0.83066492129 micro, 0.698180420621 macro, POS included = False
+Total attribute F1s: 0.830905831128 micro, 0.693788526379 macro, POS included = False
+POS % OOV accuracy: 0.68262326472
+POS % OOV accuracy: 0.687937062937
+POS % Wrong that are OOV: 0.209346384591
+POS % Wrong that are OOV: 0.22523659306
+
+./log-en-005000-noseq-pginit-mchar-05dr-4
+POS Dev Accuracy: 0.869452839192
+POS Test Accuracy: 0.873645202423
+Total attribute F1s: 0.82247851269 micro, 0.673067943976 macro, POS included = False
+Total attribute F1s: 0.822041615835 micro, 0.66925022432 macro, POS included = False
+POS % OOV accuracy: 0.67352800383
+POS % OOV accuracy: 0.682255244755
+POS % Wrong that are OOV: 0.207736826074
+POS % Wrong that are OOV: 0.22926521602
+
+./log-en-005000-noseq-pginit-mchar-05dr-5
+POS Dev Accuracy: 0.869731191347
+POS Test Accuracy: 0.870457443417
+Total attribute F1s: 0.8361383548 micro, 0.676116019705 macro, POS included = False
+Total attribute F1s: 0.836868981117 micro, 0.671373006167 macro, POS included = False
+POS % OOV accuracy: 0.685974150311
+POS % OOV accuracy: 0.679632867133
+POS % Wrong that are OOV: 0.200244200244
+POS % Wrong that are OOV: 0.225469086435
+
+./log-en-010000-noseq-pginit-mchar-05dr-1
+POS Dev Accuracy: 0.890488309209
+POS Test Accuracy: 0.894843799809
+Total attribute F1s: 0.892861925807 micro, 0.78139788456 macro, POS included = False
+Total attribute F1s: 0.895524423083 micro, 0.779202559007 macro, POS included = False
+POS % OOV accuracy: 0.707515557683
+POS % OOV accuracy: 0.700611888112
+POS % Wrong that are OOV: 0.221859114016
+POS % Wrong that are OOV: 0.259568018189
+
+./log-en-010000-noseq-pginit-mchar-05dr-2
+POS Dev Accuracy: 0.892436774296
+POS Test Accuracy: 0.896198597386
+Total attribute F1s: 0.898482021282 micro, 0.773450345113 macro, POS included = False
+Total attribute F1s: 0.899656463108 micro, 0.78272786802 macro, POS included = False
+POS % OOV accuracy: 0.692675921494
+POS % OOV accuracy: 0.701048951049
+POS % Wrong that are OOV: 0.237338262477
+POS % Wrong that are OOV: 0.262571976967
+
+./log-en-010000-noseq-pginit-mchar-05dr-3
+POS Dev Accuracy: 0.895339589629
+POS Test Accuracy: 0.897433854001
+Total attribute F1s: 0.896921017403 micro, 0.79216380616 macro, POS included = False
+Total attribute F1s: 0.895099410019 micro, 0.78440469893 macro, POS included = False
+POS % OOV accuracy: 0.710866443274
+POS % OOV accuracy: 0.714160839161
+POS % Wrong that are OOV: 0.229483282675
+POS % Wrong that are OOV: 0.254079254079
+
+./log-en-010000-noseq-pginit-mchar-05dr-4
+POS Dev Accuracy: 0.893430889136
+POS Test Accuracy: 0.896636914249
+Total attribute F1s: 0.901385329246 micro, 0.751743559962 macro, POS included = False
+Total attribute F1s: 0.901643816929 micro, 0.747409454493 macro, POS included = False
+POS % OOV accuracy: 0.712781235041
+POS % OOV accuracy: 0.700611888112
+POS % Wrong that are OOV: 0.223880597015
+POS % Wrong that are OOV: 0.264070932922
+
+./log-en-010000-noseq-pginit-mchar-05dr-5
+POS Dev Accuracy: 0.895419118817
+POS Test Accuracy: 0.894883646796
+Total attribute F1s: 0.893963184445 micro, 0.77065951664 macro, POS included = False
+Total attribute F1s: 0.894733269988 micro, 0.779841424207 macro, POS included = False
+POS % OOV accuracy: 0.704164672092
+POS % OOV accuracy: 0.694055944056
+POS % Wrong that are OOV: 0.234980988593
+POS % Wrong that are OOV: 0.265352539803
+
+./log-en-020000-noseq-pginit-mchar-05dr-1
+POS Dev Accuracy: 0.910330841419
+POS Test Accuracy: 0.908949633408
+Total attribute F1s: 0.922459046445 micro, 0.812184533519 macro, POS included = False
+Total attribute F1s: 0.920058386232 micro, 0.804668938586 macro, POS included = False
+POS % OOV accuracy: 0.719961704165
+POS % OOV accuracy: 0.706730769231
+POS % Wrong that are OOV: 0.259423503326
+POS % Wrong that are OOV: 0.293654266958
+
+./log-en-020000-noseq-pginit-mchar-05dr-2
+POS Dev Accuracy: 0.911205662478
+POS Test Accuracy: 0.912097545426
+Total attribute F1s: 0.922884909805 micro, 0.81330207631 macro, POS included = False
+Total attribute F1s: 0.921081630923 micro, 0.804642576385 macro, POS included = False
+POS % OOV accuracy: 0.718046912398
+POS % OOV accuracy: 0.709353146853
+POS % Wrong that are OOV: 0.263770712047
+POS % Wrong that are OOV: 0.301450589302
+
+./log-en-020000-noseq-pginit-mchar-05dr-3
+POS Dev Accuracy: 0.910808016542
+POS Test Accuracy: 0.91301402614
+Total attribute F1s: 0.925513998433 micro, 0.811560464363 macro, POS included = False
+Total attribute F1s: 0.923573040955 micro, 0.804757902385 macro, POS included = False
+POS % OOV accuracy: 0.715174724749
+POS % OOV accuracy: 0.721590909091
+POS % Wrong that are OOV: 0.265269728043
+POS % Wrong that are OOV: 0.291800274851
+
+./log-en-020000-noseq-pginit-mchar-05dr-4
+POS Dev Accuracy: 0.909495784953
+POS Test Accuracy: 0.909348103283
+Total attribute F1s: 0.923606835616 micro, 0.812471142878 macro, POS included = False
+Total attribute F1s: 0.919198076467 micro, 0.803429716384 macro, POS included = False
+POS % OOV accuracy: 0.722355193873
+POS % OOV accuracy: 0.722902097902
+POS % Wrong that are OOV: 0.254833040422
+POS % Wrong that are OOV: 0.278681318681
+
+./log-en-020000-noseq-pginit-mchar-05dr-5
+POS Dev Accuracy: 0.909257197391
+POS Test Accuracy: 0.91054351291
+Total attribute F1s: 0.920101848924 micro, 0.807752911952 macro, POS included = False
+Total attribute F1s: 0.918977484341 micro, 0.80419749277 macro, POS included = False
+POS % OOV accuracy: 0.714696026807
+POS % OOV accuracy: 0.713723776224
+POS % Wrong that are OOV: 0.261174408414
+POS % Wrong that are OOV: 0.291759465479
+
+./log-en-050000-noseq-pginit-mchar-05dr-1
+POS Dev Accuracy: 0.921425163035
+POS Test Accuracy: 0.923135160982
+Total attribute F1s: 0.939692982456 micro, 0.839336257458 macro, POS included = False
+Total attribute F1s: 0.94079236729 micro, 0.836753850158 macro, POS included = False
+POS % OOV accuracy: 0.724269985639
+POS % OOV accuracy: 0.722465034965
+POS % Wrong that are OOV: 0.291497975709
+POS % Wrong that are OOV: 0.329186106791
+
+./log-en-050000-noseq-pginit-mchar-05dr-2
+POS Dev Accuracy: 0.925361857802
+POS Test Accuracy: 0.927518329614
+Total attribute F1s: 0.939717315664 micro, 0.831704341427 macro, POS included = False
+Total attribute F1s: 0.940542372881 micro, 0.82797017827 macro, POS included = False
+POS % OOV accuracy: 0.732407850646
+POS % OOV accuracy: 0.732954545455
+POS % Wrong that are OOV: 0.297815663292
+POS % Wrong that are OOV: 0.33589884552
+
+./log-en-050000-noseq-pginit-mchar-05dr-3
+POS Dev Accuracy: 0.924924447272
+POS Test Accuracy: 0.925685368186
+Total attribute F1s: 0.93465379494 micro, 0.825442623115 macro, POS included = False
+Total attribute F1s: 0.938048301324 micro, 0.821738437242 macro, POS included = False
+POS % OOV accuracy: 0.730971756821
+POS % OOV accuracy: 0.727272727273
+POS % Wrong that are OOV: 0.297669491525
+POS % Wrong that are OOV: 0.334584450402
+
+./log-en-050000-noseq-pginit-mchar-05dr-4
+POS Dev Accuracy: 0.923373628122
+POS Test Accuracy: 0.924330570609
+Total attribute F1s: 0.938022226283 micro, 0.836838136592 macro, POS included = False
+Total attribute F1s: 0.939633878117 micro, 0.834997670015 macro, POS included = False
+POS % OOV accuracy: 0.732886548588
+POS % OOV accuracy: 0.729020979021
+POS % Wrong that are OOV: 0.289569278672
+POS % Wrong that are OOV: 0.326487625066
+
+./log-en-050000-noseq-pginit-mchar-05dr-5
+POS Dev Accuracy: 0.924646095117
+POS Test Accuracy: 0.926163532037
+Total attribute F1s: 0.939413594106 micro, 0.836989807784 macro, POS included = False
+Total attribute F1s: 0.942286874154 micro, 0.834717836646 macro, POS included = False
+POS % OOV accuracy: 0.728578267113
+POS % OOV accuracy: 0.725087412587
+POS % Wrong that are OOV: 0.299208443272
+POS % Wrong that are OOV: 0.339449541284
+
+./log-en-100000-noseq-pginit-mchar-05dr-1
+POS Dev Accuracy: 0.929855256879
+POS Test Accuracy: 0.932299968122
+Total attribute F1s: 0.948119626913 micro, 0.854568347023 macro, POS included = False
+Total attribute F1s: 0.950193513495 micro, 0.848764124155 macro, POS included = False
+POS % OOV accuracy: 0.738152225945
+POS % OOV accuracy: 0.728146853147
+POS % Wrong that are OOV: 0.310090702948
+POS % Wrong that are OOV: 0.366097704532
+
+./log-en-100000-noseq-pginit-mchar-05dr-2
+POS Dev Accuracy: 0.932917130587
+POS Test Accuracy: 0.931662416321
+Total attribute F1s: 0.948406701981 micro, 0.853878748296 macro, POS included = False
+Total attribute F1s: 0.94998984909 micro, 0.85017759821 macro, POS included = False
+POS % OOV accuracy: 0.740067017712
+POS % OOV accuracy: 0.728583916084
+POS % Wrong that are OOV: 0.321873147599
+POS % Wrong that are OOV: 0.362099125364
+
+./log-en-100000-noseq-pginit-mchar-05dr-3
+POS Dev Accuracy: 0.931724192779
+POS Test Accuracy: 0.932817978961
+Total attribute F1s: 0.947100762826 micro, 0.853208300599 macro, POS included = False
+Total attribute F1s: 0.950753088509 micro, 0.84978969516 macro, POS included = False
+POS % OOV accuracy: 0.740545715653
+POS % OOV accuracy: 0.736451048951
+POS % Wrong that are OOV: 0.315666860804
+POS % Wrong that are OOV: 0.357651245552
+
+./log-en-100000-noseq-pginit-mchar-05dr-4
+POS Dev Accuracy: 0.931525369811
+POS Test Accuracy: 0.93218042716
+Total attribute F1s: 0.946122516832 micro, 0.848676240155 macro, POS included = False
+Total attribute F1s: 0.948877193576 micro, 0.848350988762 macro, POS included = False
+POS % OOV accuracy: 0.734801340354
+POS % OOV accuracy: 0.732954545455
+POS % Wrong that are OOV: 0.321718931475
+POS % Wrong that are OOV: 0.358989424207
+
+./log-en-100000-noseq-pginit-mchar-05dr-5
+POS Dev Accuracy: 0.930491490377
+POS Test Accuracy: 0.933933694613
+Total attribute F1s: 0.947466387462 micro, 0.851825190179 macro, POS included = False
+Total attribute F1s: 0.951754237575 micro, 0.848524034578 macro, POS included = False
+POS % OOV accuracy: 0.737194830062
+POS % OOV accuracy: 0.742132867133
+POS % Wrong that are OOV: 0.314073226545
+POS % Wrong that are OOV: 0.355850422195
+
+./log-en-204587-noseq-pginit-mchar-05dr-1
+POS Dev Accuracy: 0.938086527756
+POS Test Accuracy: 0.939034109021
+Total attribute F1s: 0.953746101268 micro, 0.863623512754 macro, POS included = False
+Total attribute F1s: 0.956559954025 micro, 0.861372473479 macro, POS included = False
+POS % OOV accuracy: 0.744853997128
+POS % OOV accuracy: 0.733391608392
+POS % Wrong that are OOV: 0.342324983943
+POS % Wrong that are OOV: 0.398692810458
+
+./log-en-204587-noseq-pginit-mchar-05dr-2
+POS Dev Accuracy: 0.937967233975
+POS Test Accuracy: 0.940149824673
+Total attribute F1s: 0.952131451974 micro, 0.86009532597 macro, POS included = False
+Total attribute F1s: 0.957093367131 micro, 0.858089178672 macro, POS included = False
+POS % OOV accuracy: 0.744853997128
+POS % OOV accuracy: 0.744755244755
+POS % Wrong that are OOV: 0.341666666667
+POS % Wrong that are OOV: 0.388814913449
+
+./log-en-204587-noseq-pginit-mchar-05dr-3
+POS Dev Accuracy: 0.93681406076
+POS Test Accuracy: 0.938436404208
+Total attribute F1s: 0.952816082406 micro, 0.865310262844 macro, POS included = False
+Total attribute F1s: 0.956833680221 micro, 0.86081083313 macro, POS included = False
+POS % OOV accuracy: 0.738152225945
+POS % OOV accuracy: 0.736013986014
+POS % Wrong that are OOV: 0.344241661422
+POS % Wrong that are OOV: 0.390938511327
+
+./log-en-204587-noseq-pginit-mchar-05dr-4
+POS Dev Accuracy: 0.936297121043
+POS Test Accuracy: 0.938595792158
+Total attribute F1s: 0.951792828685 micro, 0.859513115509 macro, POS included = False
+Total attribute F1s: 0.955512703407 micro, 0.856660234186 macro, POS included = False
+POS % OOV accuracy: 0.738630923887
+POS % OOV accuracy: 0.732954545455
+POS % Wrong that are OOV: 0.340823970037
+POS % Wrong that are OOV: 0.39649578196
+
+./log-en-204587-noseq-pginit-mchar-05dr-5
+POS Dev Accuracy: 0.937609352632
+POS Test Accuracy: 0.93987089576
+Total attribute F1s: 0.953435481997 micro, 0.868053831562 macro, POS included = False
+Total attribute F1s: 0.957547249624 micro, 0.862113220167 macro, POS included = False
+POS % OOV accuracy: 0.745811393011
+POS % OOV accuracy: 0.746066433566
+POS % Wrong that are OOV: 0.338432122371
+POS % Wrong that are OOV: 0.385023194168
+

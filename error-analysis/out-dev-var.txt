@@ -1,0 +1,13 @@
+
+Dataset: results/en_mtags-pos.pkl
+Using Dev instead of Test: True
+Model input: logs/log-onlypos-noseq-varinit-char-nodr/model_epoch-20.bin
+Objective: No Sequence Model
+
+
+Number dev instances: 2002
+POS Dev Accuracy: 0.944329568952
+POS % OOV accuracy: 0.779320248923
+POS % Wrong that are OOV: 0.329285714286
+Total attribute F1s: 0 micro, nan macro, POS included = False
+Total tokens: 25148, Total OOV: 2089, % OOV: 0.0830682360426

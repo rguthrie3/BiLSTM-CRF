@@ -1,0 +1,26 @@
+   23  python model.py --dataset data/en-ud-verbs-mtpred.pkl --word-embeddings ../data/embs/en_polyglot_vectors_ud.txt --loss-prop --num-epochs 100 --log-dir en-verbs-pg-100it
+   24  python model.py --dataset data/en-ud-nouns-mtpred.pkl --word-embeddings ../data/embs/en_wiki_vectors_varembed-64d_ud.txt --loss-prop --num-epochs 100 --log-dir en-nouns-ve-100it
+   25  python model.py --dataset data/en-ud-verbs-mtpred.pkl --word-embeddings ../data/embs/en_wiki_vectors_varembed-64d_ud.txt --loss-prop --num-epochs 100 --log-dir en-verbs-ve-100it
+   26  python model.py --dataset data/en-ud-nouns-mtpred.pkl --word-embeddings ../data/embs/en_wiki_vectors_varembed-64d_ud.txt --loss-prop --num-epochs 100 --use-char-rnn --log-dir en-nouns-ve-ch-100it
+   27  python model.py --dataset data/en-ud-nouns-mtpred.pkl --word-embeddings ../data/embs/en_polyglot_vectors_ud.txt --loss-prop --num-epochs 100 --use-char-rnn --log-dir en-nouns-pg-ch-100it
+   28  python model.py --dataset data/en-ud-verbs-mtpred.pkl --word-embeddings ../data/embs/en_polyglot_vectors_ud.txt --loss-prop --num-epochs 100 --use-char-rnn --log-dir en-verbs-pg-ch-100it
+   29* python model.py --dataset data/en-ud-verbs-mtpred.pkl --word-embeddings ../data/embs/en_wiki_vectors_varembed-64d_ud.txt --loss-prop --num-epochs 100 --use-char-rnn --log-dir en-verbs-ri-ch-100it
+   30  for pos in verbs nouns; do python model.py --dataset data/en-ud-${pos}-mtpred.pkl --loss-prop --num-epochs 100 --use-char-rnn --log-dir en-${pos}-ri-ch-100it; done
+   31  for pos in verbs nouns; do python model.py --dataset data/en-ud-${pos}-mtpred.pkl --loss-prop --num-epochs 100 --log-dir en-${pos}-ri-100it; done
+   32* python model.py --dataset data/en-ud-verbs-mtpred.pkl --word-embeddings ../data/embs/en_polyglot_vectors_ud.txt --loss-prop --num-epochs 10 --use-char-rnn --log-dir en-verbs-pg-nlp-debug
+   33  python model.py --dataset data/en-ud-verbs-mtpred.pkl --word-embeddings ../data/embs/en_polyglot_vectors_ud.txt --loss-prop --num-epochs 10 --log-dir en-verbs-pg-debug
+   34  python model.py --dataset data/en-ud-nouns-mtpred.pkl --word-embeddings ../data/embs/en_polyglot_vectors_ud.txt --loss-prop --num-epochs 10 --log-dir en-nouns-pg-debug
+   35  python model.py --dataset data/en-ud-verbs-mtpred.pkl --word-embeddings ../data/embs/en_polyglot_vectors_ud.txt --loss-prop --num-epochs 10 --log-dir en-verbs-pg-debug
+   36  python model.py --dataset data/en-ud-verbs-mtpred.pkl --word-embeddings ../polyglot_trainer/en-cpg-fb-100ep-embs.txt --loss-prop --num-epochs 100 --log-dir en-verbs-pgc-100it
+   37  python model.py --dataset data/en-ud-verbs-mtpred.pkl --word-embeddings ../data/embs/en_polyglot_vectors_ud.txt --num-epochs 100 --log-dir en-verbs-pg-nlp-100it
+   38  python model.py --dataset data/en-ud-verbs-mtpred.pkl --word-embeddings ../data/embs/en_wiki_vectors_varembed-64d_ud.txt --num-epochs 100 --log-dir en-verbs-ve-nlp-100it
+   39  python model.py --dataset data/en-ud-verbs-mtpred.pkl --word-embeddings ../data/embs/en_wiki_vectors_varembed-64d_ud.txt --num-epochs 100 --use-char-rnn --log-dir en-verbs-ve-ch-nlp-100it
+   40  python model.py --dataset data/en-ud-verbs-mtpred.pkl --word-embeddings ../data/embs/en-embeds-64-dim-char-prior-capitalized.txt --num-epochs 100 --log-dir en-verbs-chve-100it
+   41  python model.py --dataset data/en-ud-verbs-mtpred.pkl --word-embeddings ../data/embs/en-embeds-64-dim-char-prior-capitalized.txt --loss-prop --num-epochs 100 --log-dir en-verbs-chve-100it
+   42  python model.py --dataset data/en-ud-verbs-mtpred.pkl --word-embeddings ../data/embs/en-embeds-64-dim-char-prior-capitalized.txt --loss-prop --num-epochs 100 --use-char-rnn --log-dir en-verbs-chve-ch-100it
+   43  python model.py --dataset data/en-ud-nouns-mtpred.pkl --word-embeddings ../data/embs/en-embeds-64-dim-char-prior-capitalized.txt --loss-prop --num-epochs 100 --use-char-rnn --log-dir en-nouns-chve-ch-100it
+   44  python model.py --dataset data/en-ud-nouns-mtpred.pkl --word-embeddings ../data/embs/en-embeds-64-dim-char-prior-capitalized.txt --loss-prop --num-epochs 100 --log-dir en-nouns-chve-100it
+   45  for pos in nouns verbs; do python model.py --dataset data/en-ud-${pos}-mtpred.pkl --word-embeddings ../data/embs/en_polyglot_vectors_ud.txt --num-epochs 100 --hidden-dim -1 --log-dir en-${pos}-1l-pg-100it; done
+   46  for pos in nouns verbs; do python model.py --dataset data/en-ud-${pos}-mtpred.pkl --word-embeddings ../data/embs/en_polyglot_vectors_ud.txt --loss-prop --num-epochs 100 --hidden-dim -1 --log-dir en-${pos}-1l-pg-100it; done
+   47  for pos in nouns verbs; do python model.py --dataset data/en-ud-${pos}-mtpred.pkl --word-embeddings ../data/embs/en_polyglot_vectors_ud.txt --loss-prop --num-epochs 100 --hidden-dim -1 --log-dir --use-char-rnn en-${pos}-1l-pg-ch-100it; done
+   48  for pos in nouns verbs; do python model.py --dataset data/en-ud-${pos}-mtpred.pkl --word-embeddings ../data/embs/en_polyglot_vectors_ud.txt --loss-prop --num-epochs 100 --hidden-dim -1 --use-char-rnn --log-dir en-${pos}-1l-pg-ch-100it; done

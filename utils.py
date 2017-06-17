@@ -3,7 +3,11 @@ import itertools
 import codecs
 import numpy as np
 import matplotlib.pyplot as plt
+import dynet as dy
 from sklearn.metrics import confusion_matrix
+
+NONE_TAG = "<NONE>"
+POS_KEY = "POS"
 
 class CSVLogger:
 
@@ -56,6 +60,21 @@ class ConfusionMatrix:
         plt.show()
 
 
+def kl_div(x, y):
+    sig_x = dy.logistic(x)
+    exp_x = dy.exp(x)
+    exp_y = dy.exp(y)
+    exp_neg_x = dy.exp(-x)
+    exp_neg_y = dy.exp(-y)
+    shape = x.value().shape
+    matrix_size = shape[0] * shape[1]
+    ones = dy.reshape(dy.inputVector([1] * matrix_size), shape)
+    total = dy.cmult(sig_x, dy.log(ones + exp_neg_y) - dy.log(ones + exp_neg_x)) + dy.cmult(ones - sig_x, dy.log(ones + exp_y) - dy.log(ones +exp_x))
+    # now we average in a convoluted way
+    sum = dy.sum_cols(dy.transpose(dy.sum_cols(total)))
+    return dy.cdiv(sum, dy.inputVector([matrix_size]))
+
+
 def convert_instance(instance, i2w, i2t):
     sent = [ i2w[w] for w in instance.sentence ]
     tags = [ i2t[t] for t in instance.tags ]
@@ -67,7 +86,7 @@ def read_pretrained_embeddings(filename, w2i):
     with codecs.open(filename, "r", "utf-8") as f:
         for line in f:
             split = line.split()
-            if len(split) > 0:
+            if len(split) > 2:
                 word = split[0]
                 vec = split[1:]
                 word_to_embed[word] = vec
@@ -84,11 +103,13 @@ def read_pretrained_embeddings(filename, w2i):
     return out
 
 
-def split_tagstring(s, uni_key=False):
+def split_tagstring(s, uni_key=False, has_pos=False):
     '''
     Returns attribute-value mapping from UD-type CONLL field
     @param uni_key: if toggled, returns attribute-value pairs as joined strings (with the '=')
     '''
+    if has_pos:
+        s = s.split("\t")[1]
     ret = [] if uni_key else {}
     if "=" not in s: # incorrect format
         return ret
@@ -100,3 +121,28 @@ def split_tagstring(s, uni_key=False):
         else:
             ret.append(attval)
     return ret
+
+
+def morphotag_strings(i2ts, tag_mapping, pos_separate_col=True):
+    senlen = len(tag_mapping.values()[0])
+    key_value_strs = []
+    
+    # j iterates along sentence, as we're building the string representations
+    # in the opposite orientation as the mapping
+    for j in xrange(senlen): 
+        place_strs = []
+        for att, seq in tag_mapping.items():
+            val = i2ts[att][seq[j]]
+            if pos_separate_col and att == POS_KEY:
+                pos_str = val
+            elif val != NONE_TAG:
+                place_strs.append(att + "=" + val)
+        morpho_str = "|".join(sorted(place_strs))
+        if pos_separate_col:
+            key_value_strs.append(pos_str + "\t" + morpho_str)
+        else:
+            key_value_strs.append(morpho_str)            
+    return key_value_strs
+
+def sortvals(dct):
+    return [v for (k,v) in sorted(dct.items())]
